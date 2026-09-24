@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { withBase } from "@/lib/base-path";
+// Static import: the URL carries a content hash, so a new logo is never stale in cache
+import logo from "@/assets/logo.png";
 import {
   Sidebar,
   SidebarContent,
@@ -67,7 +68,7 @@ export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
               // Logo in the tile slot: the Fluid header accepts any 20px mark
               tile={
                 <Image
-                  src={withBase("/logo.png")}
+                  src={logo}
                   alt=""
                   width={20}
                   height={20}
