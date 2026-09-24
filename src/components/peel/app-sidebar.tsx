@@ -71,6 +71,8 @@ export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
                   alt=""
                   width={20}
                   height={20}
+                  // Above the fold: load right away, not lazily (no blank tile)
+                  priority
                   className="block"
                 />
               }
