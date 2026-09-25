@@ -3,9 +3,15 @@
 import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { InputField, InputGroup } from "@/components/ui/input-group";
 import { Tooltip } from "@/components/ui/tooltip";
-import { decalsInOrder, type Decal } from "@/data/decals";
+import { decalFiles, decalsInOrder, type Decal } from "@/data/decals";
 import {
   formatNumber,
   numberPresets,
@@ -54,6 +60,9 @@ interface DecalScreenProps {
   /** How many cars or robots (for static decals) */
   copies: number;
   onCopiesChange: (copies: number) => void;
+  /** Version of a decal with versions (light / dark); none — the first */
+  variant?: string;
+  onVariantChange: (variant: string) => void;
   /** Go to an adjacent decal (arrows next to the title) */
   onSelect: (id: string) => void;
 }
@@ -271,17 +280,20 @@ function StaticBody({
   onModeChange,
   copies: vehicles,
   onCopiesChange,
+  variant,
+  onVariantChange,
   header,
 }: DecalScreenProps & { header: ReactNode }) {
   const build = useBuild();
   const units = useUnits();
-  const source = decal.source;
-  const missing = decal.previews.length === 0 || !source;
+  const files = decalFiles(decal, variant);
+  const { source, preview } = files;
+  const missing = !preview || !source;
   const per = perVehicle(decal);
   // Decals: cars × decals per car (side logo is 2 per car)
   const items = vehicles * per;
   const effectiveMode: ExportMode = items > 1 ? mode : "pdf";
-  const base = `${decal.id}${vehicles > 1 ? `_${vehicles}-${decal.platform}s` : ""}`;
+  const base = `${files.id}${vehicles > 1 ? `_${vehicles}-${decal.platform}s` : ""}`;
   const fileName = `${base}.${effectiveMode}`;
 
   const getPage = (): PreviewPage => ({
@@ -292,9 +304,7 @@ function StaticBody({
     sizeLabel: decal.artMm
       ? formatSize(decal.artMm[0], decal.artMm[1], units)
       : formatSize(decal.widthMm, decal.heightMm, units),
-    content: missing
-      ? { type: "missing" }
-      : { type: "image", src: decal.previews[0] },
+    content: missing ? { type: "missing" } : { type: "image", src: preview },
     transparent: decal.transparentPreview,
     cut: decal.cutMm,
     cutPath: decal.cutPath,
@@ -309,6 +319,32 @@ function StaticBody({
       }
       island={
         <DownloadIsland
+          variant={
+            decal.variants && (
+              <IslandRow label="Version">
+                {/* Native borderless Select, as for the file format */}
+                <Select
+                  value={
+                    decal.variants.find((v) => v.id === variant)?.id ??
+                    decal.variants[0].id
+                  }
+                  onValueChange={(v) => {
+                    build.reset();
+                    onVariantChange(v as string);
+                  }}
+                >
+                  <SelectTrigger variant="borderless" className="min-w-0" />
+                  <SelectContent>
+                    {decal.variants.map((v, i) => (
+                      <SelectItem key={v.id} index={i} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </IslandRow>
+            )
+          }
           quantity={
             <IslandRow label={vehiclesLabel(decal)}>
               <CopiesStepper

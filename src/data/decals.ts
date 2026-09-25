@@ -25,6 +25,14 @@ export const productionLabels: Record<Production, string> = {
   print: "Print",
 };
 
+export interface DecalVariant {
+  /** Suffix of the file names: car-uber-faq-qr-code-dark.pdf */
+  id: string;
+  name: string;
+  preview: string;
+  source: string;
+}
+
 export interface Decal {
   id: string;
   platform: Platform;
@@ -63,6 +71,9 @@ export interface Decal {
   perVehicle?: number;
   /** Where a car's decals go if there are several: «left and right side». */
   perVehicleNote?: string;
+  /** Versions of one decal (FAQ QR code: light and dark), each with its own preview
+   *  and PDF; the first is the default. Such a decal has no previews/source of its own. */
+  variants?: DecalVariant[];
   /** Temporarily hidden from the UI (e.g. no working file). */
   hidden?: boolean;
   /** Light artwork on a transparent background — preview on a checkerboard. */
@@ -277,22 +288,36 @@ export const allDecals: Decal[] = [
     print: "Black",
   },
   {
-    id: "car-ride-faq-qr",
+    id: "car-uber-faq-qr-code",
     platform: "car",
-    // Hidden: the source PDF is empty, waiting for a working file
-    hidden: true,
-    name: "Ride FAQ QR",
-    description: "White QR code that opens the ride FAQ.",
+    name: "FAQ QR code",
+    description:
+      "QR code that opens the Uber autonomous rides page for Dallas.",
     kind: "static",
     category: "service",
-    group: "base",
-    widthMm: 50.8,
-    heightMm: 50.8,
-    // The source PDF is empty (no visible content) — a working file is needed.
+    group: "uber",
+    widthMm: 56.8,
+    heightMm: 56.8,
+    artMm: [50.8, 50.8],
+    cutPath:
+      "M 46.8 3 L 10.01 3 C 7.55 3 6.33 3 5.39 3.48 C 4.57 3.9 3.9 4.57 3.48 5.39 C 3 6.33 3 7.55 3 10 L 3 46.8 C 3 49.25 3 50.48 3.48 51.41 C 3.9 52.24 4.57 52.9 5.39 53.32 C 6.33 53.8 7.55 53.8 10.01 53.8 L 46.8 53.8 C 49.25 53.8 50.48 53.8 51.41 53.32 C 52.24 52.9 52.9 52.23 53.32 51.41 C 53.8 50.47 53.8 49.25 53.8 46.8 L 53.8 10.01 C 53.8 7.55 53.8 6.33 53.32 5.39 C 52.9 4.57 52.23 3.9 51.41 3.48 C 50.47 3 49.25 3 46.8 3 L 46.8 3 Z",
     previews: [],
-    production: "print",
-    print: "White",
-    transparentPreview: true,
+    variants: [
+      {
+        id: "light",
+        name: "Light",
+        preview: "/decals/preview/car-uber-faq-qr-code-light.svg",
+        source: "/decals/source/car-uber-faq-qr-code-light.pdf",
+      },
+      {
+        id: "dark",
+        name: "Dark",
+        preview: "/decals/preview/car-uber-faq-qr-code-dark.svg",
+        source: "/decals/source/car-uber-faq-qr-code-dark.pdf",
+      },
+    ],
+    production: "print-cut",
+    print: "Black",
   },
   {
     id: "car-body-wrap",
@@ -391,6 +416,18 @@ export const allDecals: Decal[] = [
     print: "Black",
   },
 ];
+
+/** Preview and PDF of a decal, or of its version (the first one by default). */
+export function decalFiles(
+  decal: Decal,
+  variantId?: string,
+): { id: string; preview?: string; source?: string } {
+  const vs = decal.variants;
+  if (!vs?.length)
+    return { id: decal.id, preview: decal.previews[0], source: decal.source };
+  const v = vs.find((x) => x.id === variantId) ?? vs[0];
+  return { id: `${decal.id}-${v.id}`, preview: v.preview, source: v.source };
+}
 
 /** Decals in the UI — without temporarily hidden ones. */
 export const decals = allDecals.filter((d) => !d.hidden);

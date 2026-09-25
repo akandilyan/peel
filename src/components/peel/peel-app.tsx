@@ -18,13 +18,14 @@ import { HomeScreen } from "./home-screen";
 // another decal keeps what was entered, and after a page reload everything
 // returns to defaults (not saved to the URL or the browser).
 // input — numbers (for generators), mode — file format, copies — how many cars
-// or robots (for static decals).
+// or robots (for static decals), variant — version of a decal with versions.
 type Params = {
   input: Record<string, string>;
   mode: Record<string, ExportMode>;
   copies: Record<string, number>;
+  variant: Record<string, string>;
 };
-const empty: Params = { input: {}, mode: {}, copies: {} };
+const empty: Params = { input: {}, mode: {}, copies: {}, variant: {} };
 let params = empty;
 const listeners = new Set<() => void>();
 
@@ -53,7 +54,7 @@ export function PeelApp() {
   const rawId = pathname.split("/")[1] || undefined;
   const pathId = rawId && (renamedDecals[rawId] ?? rawId);
   const decal = pathId ? decals.find((d) => d.id === pathId) : undefined;
-  const { input, mode, copies } = useSyncExternalStore(
+  const { input, mode, copies, variant } = useSyncExternalStore(
     subscribe,
     () => params,
     () => empty,
@@ -113,6 +114,8 @@ export function PeelApp() {
                 onModeChange={(m) => setParam("mode", decal.id, m)}
                 copies={copies[decal.id] ?? 1}
                 onCopiesChange={(n) => setParam("copies", decal.id, n)}
+                variant={variant[decal.id]}
+                onVariantChange={(v) => setParam("variant", decal.id, v)}
                 onSelect={selectById}
               />
             ) : (

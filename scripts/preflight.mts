@@ -579,23 +579,30 @@ const reports: Report[] = [];
 
 for (const d of decals) {
   if (d.kind !== "static") continue;
-  if (!d.source) continue;
-  const path = "public" + d.source;
-  if (!existsSync(path)) {
-    reports.push({ file: d.id, issues: [{ level: "error", msg: `source missing: ${d.source}` }] } as Report);
-    continue;
+  // A decal with versions: each version is its own file with one preview
+  const files = d.variants?.length
+    ? d.variants.map((v) => ({ source: v.source, previews: [v.preview] }))
+    : d.source
+      ? [{ source: d.source, previews: d.previews }]
+      : [];
+  for (const f of files) {
+    const path = "public" + f.source;
+    if (!existsSync(path)) {
+      reports.push({ file: d.id, issues: [{ level: "error", msg: `source missing: ${f.source}` }] } as Report);
+      continue;
+    }
+    const r = await preflight(f.source.split("/").pop()!, readFileSync(path));
+    for (const pv of f.previews) if (!existsSync("public" + pv)) r.issues.push({ level: "error", msg: `preview missing: ${pv}` });
+    const pagesInData = f.previews.length;
+    if (pagesInData !== r.pages) r.issues.push({ level: "warn", msg: `data has ${pagesInData} preview(s), PDF has ${r.pages} page(s)` });
+    judge(r, {
+      production: d.production,
+      sheet: [d.widthMm, d.heightMm],
+      art: d.artMm,
+      cut: d.cutMm,
+    });
+    reports.push(r);
   }
-  const r = await preflight(d.source.split("/").pop()!, readFileSync(path));
-  for (const pv of d.previews) if (!existsSync("public" + pv)) r.issues.push({ level: "error", msg: `preview missing: ${pv}` });
-  const pagesInData = d.previews.length;
-  if (pagesInData !== r.pages) r.issues.push({ level: "warn", msg: `data has ${pagesInData} preview(s), PDF has ${r.pages} page(s)` });
-  judge(r, {
-    production: d.production,
-    sheet: [d.widthMm, d.heightMm],
-    art: d.artMm,
-    cut: d.cutMm,
-  });
-  reports.push(r);
 }
 
 // Numbers — built by the same code as the UI

@@ -195,6 +195,10 @@ const jobs: Job[] = [
     prepress: { outlineText: true },
   },
   { id: "robot-qr-code", addCut: true, card: true },
+  // Uber FAQ QR: two color versions, each its own file; in the dark one's original
+  // the black card has 2 mm of bleed past the outline, in the same rounded shape
+  { id: "car-uber-faq-qr-code-light", addCut: true, card: true },
+  { id: "car-uber-faq-qr-code-dark", addCut: true, card: true },
   // Wrap: the designer draws the pieces as lavender fills with red outlines
   { id: "car-body-wrap", addCut: false, cutFill: "0.75 0.69 1" },
 ];
@@ -522,7 +526,7 @@ function toInlineSvg(text: string): string {
 // Next.js tracks changes (it doesn't see fs in the page) and no fetching is needed
 const inlineSvgs: Record<string, string> = {};
 for (const d of allDecals)
-  for (const src of d.previews)
+  for (const src of [...d.previews, ...(d.variants ?? []).map((v) => v.preview)])
     if (src.endsWith(".svg") && existsSync("public" + src))
       inlineSvgs[src] = toInlineSvg(readFileSync("public" + src, "utf8"));
 writeFileSync("src/data/preview-svgs.json", JSON.stringify(inlineSvgs) + "\n");

@@ -15,6 +15,15 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.3.0",
+    date: "2026-09-25",
+    changes: [
+      "Uber FAQ QR code: 2 × 2 in card, light and dark versions.",
+      "Decals with versions: pick one in the Download panel.",
+    ],
+    decals: ["car-uber-faq-qr-code"],
+  },
+  {
     version: "0.2.1",
     date: "2026-09-25",
     changes: ["Body wrap: the final cut set — two pieces per side, 1249 × 509 mm sheet."],

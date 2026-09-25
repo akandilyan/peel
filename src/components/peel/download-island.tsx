@@ -40,8 +40,10 @@ export function IslandRow({
 // CUSTOM: the island is an aside p-4 rounded-lg bg-muted card, as on
 // fluidfunctionalism.com. Native Select and Button inside. «Label — control»
 // rows aligned on one left edge: how many (numbers or cars), file format,
-// the Download button and the build status line.
+// the Download button and the build status line. Decals with versions get a
+// Version row on top.
 export function DownloadIsland({
+  variant,
   quantity,
   caption,
   items,
@@ -51,6 +53,8 @@ export function DownloadIsland({
   build,
   onDownload,
 }: {
+  /** Version row (light / dark) above the quantity, for decals with versions */
+  variant?: ReactNode;
   quantity: ReactNode;
   /** Hint in small text under the quantity */
   caption?: string;
@@ -141,6 +145,7 @@ export function DownloadIsland({
       >
         Download
       </h2>
+      {variant}
       <div className="flex flex-col gap-1">
         {quantity}
         {caption && (
