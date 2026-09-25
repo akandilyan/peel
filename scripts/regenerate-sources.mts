@@ -317,7 +317,7 @@ async function buildCutFill(job: Job, src: PDFDocument, color: string) {
     page.node.addContentStream(ctx.register(ctx.flateStream(ops.join("\n") + "\n")));
     page.setTrimBox(MARGIN, MARGIN, cutW, cutH);
     page.setBleedBox(0, 0, w, h);
-    pages.push({ sheet: [mm(w), mm(h)], pieces: shapes.length });
+    pages.push({ sheet: [mm(w), mm(h)], art: [artMm(bw), artMm(bh)], pieces: shapes.length });
 
     if (i === 0) {
       const d = shapes

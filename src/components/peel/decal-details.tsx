@@ -67,7 +67,9 @@ export function staticSize(decal: Decal, units: Units): SizeInfo {
     };
   const cut = decal.cutPath
     ? "Cut along card outline"
-    : decal.cutMm && `Cut ${mmPair(decal.cutMm[2], decal.cutMm[3])}`;
+    : decal.category === "wrap"
+      ? "Separate pieces"
+      : decal.cutMm && `Cut ${mmPair(decal.cutMm[2], decal.cutMm[3])}`;
   return {
     main: mmPair(decal.artMm[0], decal.artMm[1]),
     sub: [cut, sheet].filter(Boolean).join(" · "),

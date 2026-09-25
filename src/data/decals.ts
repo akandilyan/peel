@@ -304,6 +304,7 @@ export const allDecals: Decal[] = [
     group: "base",
     widthMm: 1249,
     heightMm: 509,
+    artMm: [1242.4, 502.3],
     previews: ["/decals/preview/car-body-wrap.svg"],
     source: "/decals/source/car-body-wrap.pdf",
     production: "cut",
