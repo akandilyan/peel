@@ -15,6 +15,12 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.2.1",
+    date: "2026-09-25",
+    changes: ["Body wrap: the final cut set — two pieces per side, 1249 × 509 mm sheet."],
+    decals: ["car-body-wrap"],
+  },
+  {
     version: "0.2.0",
     date: "2026-09-24",
     changes: [

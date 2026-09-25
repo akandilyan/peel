@@ -48,12 +48,18 @@ type Ink = { x: number; top: number; w: number; h: number };
 // MARGIN. No bleed: the background is white, so on white film it prints nothing.
 // TrimBox = backing bounds.
 // keep — don't change geometry (the sheet is ready), prepress only.
+// cutFill — plotter-cut shapes drawn as fills of this color ("r g b" or
+// "c m y k" as in the source): the cut lines are rebuilt from the fill outlines as
+// CutContour on a clean sheet, everything else in the original (fills, drawn
+// outlines) is dropped. Sheet = shapes rounded up to whole mm + MARGIN. The preview
+// is generated from the same outlines, no {id}.svg needed.
 type Job = {
   id: string;
   addCut: boolean;
   ink?: Ink;
   card?: boolean;
   keep?: boolean;
+  cutFill?: string;
   // single — the original has identical pages (left and right side): keep
   // one, the required count is assembled on download (src/lib/export-static.ts)
   single?: boolean;
@@ -189,8 +195,8 @@ const jobs: Job[] = [
     prepress: { outlineText: true },
   },
   { id: "robot-qr-code", addCut: true, card: true },
-  // Wrap: the sheet is ready, only the 0.25 pt cut line with overprint and the profile
-  { id: "car-body-wrap", addCut: false, keep: true },
+  // Wrap: the designer draws the pieces as lavender fills with red outlines
+  { id: "car-body-wrap", addCut: false, cutFill: "0.75 0.69 1" },
 ];
 
 const fileOf = (job: Job) => `${job.id}.pdf`;
@@ -204,9 +210,11 @@ const artMm = (pt: number) => Math.round((pt / PT) * 10) / 10;
 // Round up to whole mm, result in points
 const ceilMm = (mmValue: number) => Math.ceil(mmValue - 1e-9) * PT;
 
-// First filled path of the page in page coordinates (accounting for q/Q/cm) — the backing
+// Filled paths of the page in page coordinates (accounting for q/Q/cm) with their
+// fill color as written in the source ("0.75 0.69 1")
 type Seg = { op: "m" | "l" | "c" | "h"; p: number[] };
-function firstFilledPath(doc: PDFDocument, page: PDFPage): Seg[] {
+type Filled = { color: string; segs: Seg[] };
+function filledPaths(doc: PDFDocument, page: PDFPage): Filled[] {
   const c = page.node.Contents();
   const streams = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
   const text = streams
@@ -220,6 +228,9 @@ function firstFilledPath(doc: PDFDocument, page: PDFPage): Seg[] {
   const stack: number[][] = [];
   let st: number[] = [];
   let path: Seg[] = [];
+  let color = "";
+  const colors: string[] = [];
+  const out: Filled[] = [];
   const mul = (a: number[], b: number[]) => [
     a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3],
     a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3],
@@ -232,8 +243,9 @@ function firstFilledPath(doc: PDFDocument, page: PDFPage): Seg[] {
   };
   for (const t of toks) {
     if (/^[-+]?\d*\.?\d/.test(t)) { st.push(Number(t)); continue; }
-    if (t === "q") stack.push(ctm);
-    else if (t === "Q") ctm = stack.pop()!;
+    if (t === "q") { stack.push(ctm); colors.push(color); }
+    else if (t === "Q") { ctm = stack.pop()!; color = colors.pop()!; }
+    else if (["g", "rg", "k", "sc", "scn"].includes(t)) color = st.map(n).join(" ");
     else if (t === "cm") ctm = mul(st.slice(-6), ctm);
     else if (t === "m" || t === "l") path.push({ op: t, p: tr(st.slice(-2)) });
     else if (t === "c") path.push({ op: "c", p: tr(st.slice(-6)) });
@@ -241,11 +253,99 @@ function firstFilledPath(doc: PDFDocument, page: PDFPage): Seg[] {
     else if (t === "re") {
       const [x, y, w, h] = st.slice(-4);
       path.push({ op: "m", p: tr([x, y]) }, { op: "l", p: tr([x + w, y]) }, { op: "l", p: tr([x + w, y + h]) }, { op: "l", p: tr([x, y + h]) }, { op: "h", p: [] });
-    } else if (["f", "F", "f*", "b", "b*", "B", "B*"].includes(t)) { if (path.length) return path; }
+    } else if (["f", "F", "f*", "b", "b*", "B", "B*"].includes(t)) { if (path.length) out.push({ color, segs: path }); path = []; }
     else if (t === "n" || t === "S" || t === "s") path = [];
     st = [];
   }
-  throw new Error("No filled path");
+  return out;
+}
+
+// First filled path of the page — the backing
+function firstFilledPath(doc: PDFDocument, page: PDFPage): Seg[] {
+  const [first] = filledPaths(doc, page);
+  if (!first) throw new Error("No filled path");
+  return first.segs;
+}
+
+// Subpaths of a path, each closed
+function subpaths(segs: Seg[]): Seg[][] {
+  const out: Seg[][] = [];
+  for (const sg of segs) {
+    if (sg.op === "m" || !out.length) out.push([]);
+    if (sg.op !== "h") out[out.length - 1].push(sg);
+  }
+  return out.filter((sp) => sp.length > 1).map((sp) => [...sp, { op: "h", p: [] }]);
+}
+
+// Cut lines from the outlines of fills of one color (Job.cutFill)
+async function buildCutFill(job: Job, src: PDFDocument, color: string) {
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  const ctx = doc.context;
+  const tint = ctx.register(
+    ctx.obj({ FunctionType: 2, Domain: [0, 1], Range: [0, 1, 0, 1, 0, 1, 0, 1], C0: [0, 0, 0, 0], C1: [0, 1, 0, 0], N: 1 }),
+  );
+  const cs = ctx.register(ctx.obj([PDFName.of("Separation"), PDFName.of("CutContour"), PDFName.of("DeviceCMYK"), tint]));
+  const gs = ctx.register(ctx.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1, CA: 1, ca: 1 }));
+  const cutLayer = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("CUT_CONTOUR") }));
+  doc.catalog.set(PDFName.of("OCProperties"), ctx.obj({ OCGs: [cutLayer], D: { Order: [cutLayer], ON: [cutLayer], BaseState: "ON" } }));
+
+  const pages = [];
+  for (const [i, sp] of src.getPages().entries()) {
+    const shapes = filledPaths(src, sp)
+      .filter((f) => f.color === color)
+      .flatMap((f) => subpaths(f.segs));
+    if (!shapes.length) throw new Error(`${job.id}: no fills of color ${color} on page ${i + 1}`);
+    const pts = shapes.flat().flatMap((sg) => sg.p);
+    const xs = pts.filter((_, k) => k % 2 === 0);
+    const ys = pts.filter((_, k) => k % 2 === 1);
+    const bx = Math.min(...xs), by = Math.min(...ys);
+    const bw = Math.max(...xs) - bx, bh = Math.max(...ys) - by;
+    const cutW = ceilMm(artMm(bw)), cutH = ceilMm(artMm(bh));
+    const w = cutW + 2 * MARGIN, h = cutH + 2 * MARGIN;
+    const dx = MARGIN + (cutW - bw) / 2 - bx;
+    const dy = MARGIN + (cutH - bh) / 2 - by;
+
+    const page = doc.addPage([w, h]);
+    addRes(page, "ColorSpace", { CSCut: cs });
+    addRes(page, "ExtGState", { GSCut: gs });
+    addRes(page, "Properties", { MCCut: cutLayer });
+    const pathOps = shapes.flat().map((sg) => {
+      const q = sg.p.map((v, k) => n(v + (k % 2 === 0 ? dx : dy))).join(" ");
+      return sg.op === "h" ? "h" : `${q} ${sg.op}`;
+    });
+    const ops = ["/OC /MCCut BDC", "q", "/CSCut CS 1 SCN", "0.25 w 4 M 0 j 0 J", "/GSCut gs", ...pathOps, "S", "Q", "EMC"];
+    page.node.addContentStream(ctx.register(ctx.flateStream(ops.join("\n") + "\n")));
+    page.setTrimBox(MARGIN, MARGIN, cutW, cutH);
+    page.setBleedBox(0, 0, w, h);
+    pages.push({ sheet: [mm(w), mm(h)], pieces: shapes.length });
+
+    if (i === 0) {
+      const d = shapes
+        .flat()
+        .map((sg) => {
+          if (sg.op === "h") return "Z";
+          const q = [];
+          for (let k = 0; k < sg.p.length; k += 2) q.push(`${n(sg.p[k] + dx)} ${n(h - (sg.p[k + 1] + dy))}`);
+          return `${sg.op === "m" ? "M" : sg.op === "l" ? "L" : "C"} ${q.join(" ")}`;
+        })
+        .join(" ");
+      writeFileSync(
+        PREVIEW_OUT(job),
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${n(w)} ${n(h)}">` +
+          `<path stroke="${CUT_PREVIEW}" stroke-width="0.5" vector-effect="non-scaling-stroke" fill="none" d="${d}"/></svg>\n`,
+      );
+    }
+  }
+  const info = ctx.obj({
+    Title: PDFHexString.fromText(job.id),
+    Creator: PDFString.of("Peel regenerate-sources"),
+    Producer: PDFString.of("pdf-lib (https://github.com/Hopding/pdf-lib)"),
+  });
+  ctx.trailerInfo.Info = ctx.register(info);
+  addOutputIntent(doc);
+  stripPrivateData(doc);
+  writeFileSync(SRC + fileOf(job), await doc.save({ useObjectStreams: false }));
+  return { cutFill: color, pages };
 }
 
 mkdirSync("public/decals/preview", { recursive: true });
@@ -253,8 +353,12 @@ const report: Record<string, unknown> = {};
 
 for (const job of jobs) {
   if (!existsSync(ORIG + fileOf(job))) continue;
-  if (!existsSync(PREVIEW_ORIG(job))) throw new Error(`No preview original: ${PREVIEW_ORIG(job)}`);
+  if (!job.cutFill && !existsSync(PREVIEW_ORIG(job))) throw new Error(`No preview original: ${PREVIEW_ORIG(job)}`);
   const src = await PDFDocument.load(readFileSync(ORIG + fileOf(job)));
+  if (job.cutFill) {
+    report[fileOf(job)] = await buildCutFill(job, src, job.cutFill);
+    continue;
+  }
   const opts = { ...PREPRESS, ...job.prepress };
   // Backing (card) — before processing, while text hasn't been turned into outlines yet
   const cards = src.getPages().map((p) => (job.card ? firstFilledPath(src, p) : []));
