@@ -414,3 +414,15 @@ html.transitioning *, html.transitioning *::before, html.transitioning *::after 
     inherits: false;
     initial-value: 1;
 }
+/* CUSTOM: browser autofill keeps working but without its highlight — Chrome and
+   Safari paint autofilled fields blue or yellow and force the text to the
+   system field color (black in the dark theme too). The background change is
+   held off for good by a transition, the text keeps the theme's foreground. */
+input:autofill,
+input:-webkit-autofill {
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s;
+}
