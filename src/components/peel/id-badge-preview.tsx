@@ -228,6 +228,29 @@ export function IdBadgePreview({
     };
   }, [photo]);
 
+  // A phone keyboard covers the lower half of the screen, and the input it
+  // types into is hidden, so the browser doesn't scroll to it: while the name
+  // is edited, keep the bottom of the stage — the card with the name — right
+  // above the keyboard. Only with a keyboard up (the visual viewport shrinks),
+  // so a click on desktop never moves the page.
+  const editingName = focus !== null;
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!editingName || !vv) return;
+    const keepInView = () => {
+      const el = stage.current;
+      if (!el || window.innerHeight - vv.height < 120) return;
+      const r = el.getBoundingClientRect();
+      const top = vv.offsetTop + 8;
+      const bottom = vv.offsetTop + vv.height - 8;
+      const delta = r.bottom > bottom ? r.bottom - bottom : r.top < top ? r.top - top : 0;
+      if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: "smooth" });
+    };
+    keepInView();
+    vv.addEventListener("resize", keepInView);
+    return () => vv.removeEventListener("resize", keepInView);
+  }, [editingName]);
+
   // The caret blinks while a field has focus; a change shows it at once
   // (syncSelection) and restarts the blink
   useEffect(() => {

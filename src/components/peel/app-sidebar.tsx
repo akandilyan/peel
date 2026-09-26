@@ -13,6 +13,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { TabsSubtle, TabsSubtleItem } from "@/components/ui/tabs-subtle";
 import { SidebarWorkspaceHeader } from "@/components/sidebar-app/workspace-header";
@@ -39,7 +40,9 @@ interface AppSidebarProps {
 
 // Sidebar from native Fluid parts: logo header, on the right the version (button to
 // home, What's new), units and theme; platform switcher (TabsSubtle);
-// Base / Uber groups with decals at a single level.
+// Base / Uber groups with decals at a single level. Below xl, where the sidebar
+// is a slide-out panel, picking a decal or the version (home) closes it; the
+// platform tabs, units and theme leave it open.
 export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
   // Until a platform is picked manually, show the open decal's platform
   const [platformOverride, setPlatformOverride] = useState<Platform | null>(
@@ -48,10 +51,17 @@ export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
   const selected = decals.find((d) => d.id === selectedId);
   const platform = platformOverride ?? selected?.platform ?? platforms[0].id;
 
-  const select = (d: Decal) => {
-    setPlatformOverride(d.platform);
-    onSelect(d.id);
+  const { isMobile, setOpenMobile } = useSidebar();
+  // Going somewhere closes the slide-out panel
+  const navigate = (go: () => void) => {
+    go();
+    if (isMobile) setOpenMobile(false);
   };
+  const select = (d: Decal) =>
+    navigate(() => {
+      setPlatformOverride(d.platform);
+      onSelect(d.id);
+    });
 
   return (
     // As on fluidfunctionalism.com: no border, no divider strip at the edge
@@ -87,7 +97,7 @@ export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
               className="tabular-nums"
               aria-label={`What's new, version ${latest.version}`}
               aria-current={selectedId === null ? "page" : undefined}
-              onClick={onHome}
+              onClick={() => navigate(onHome)}
             >
               {latest.version}
             </Button>
