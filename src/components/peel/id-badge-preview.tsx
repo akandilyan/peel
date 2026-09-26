@@ -419,14 +419,16 @@ export function IdBadgePreview({
     velocity: number;
     moved: boolean;
     last: CardPoint | null;
-  }>({ mode: null, zone: "none", x: 0, y: 0, t: 0, velocity: 0, moved: false, last: null });
+    /** The gesture ended as a tap: the click that follows acts on it */
+    tap: boolean;
+  }>({ mode: null, zone: "none", x: 0, y: 0, t: 0, velocity: 0, moved: false, last: null, tap: false });
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const p = pick(e.clientX, e.clientY);
     const zone = zoneOf(p, style);
     const g = gesture.current;
-    Object.assign(g, { zone, x: e.clientX, y: e.clientY, t: e.timeStamp, velocity: 0, moved: false, last: p });
+    Object.assign(g, { zone, x: e.clientX, y: e.clientY, t: e.timeStamp, velocity: 0, moved: false, last: p, tap: false });
     e.currentTarget.setPointerCapture(e.pointerId);
     if (framing && zone === "photo" && photo) {
       g.mode = "photo";
@@ -510,13 +512,10 @@ export function IdBadgePreview({
     const g = gesture.current;
     const mode = g.mode;
     g.mode = null;
-    if (mode === "pending" && !g.moved) {
-      if (g.zone === "name" && g.last) focusNameAt(g.last);
-      else if (g.zone === "photo") {
-        if (photo) startFraming();
-        else fileInput.current?.click();
-      }
-    } else if (mode === "turn") {
+    // A tap acts in onClick: phones open the keyboard (and the file picker)
+    // only from a click handler
+    g.tap = mode === "pending" && !g.moved;
+    if (mode === "turn") {
       s.dragging = false;
       setCursor("grab");
       // A pause before release means no flick
@@ -524,6 +523,24 @@ export function IdBadgePreview({
       const projected = s.targetYaw + velocity * FLICK;
       s.targetYaw = yawFor(sideAt(projected), projected);
       s.targetPitch = 0;
+    }
+  };
+
+  // The browser took the touch over (a vertical swipe scrolls the page): no
+  // tap, and a turn in progress settles on a side
+  const onPointerCancel = (e: PointerEvent<HTMLDivElement>) => {
+    onPointerUp(e);
+    gesture.current.tap = false;
+  };
+
+  const onClick = () => {
+    const g = gesture.current;
+    if (!g.tap) return;
+    g.tap = false;
+    if (g.zone === "name" && g.last) focusNameAt(g.last);
+    else if (g.zone === "photo") {
+      if (photo) startFraming();
+      else fileInput.current?.click();
     }
   };
 
@@ -609,12 +626,15 @@ export function IdBadgePreview({
               ref={stage}
               tabIndex={0}
               aria-label={`ID badge preview. Drag to turn the card, click the name to type it${photo ? ", click the photo to frame it; arrow keys move it, + and − zoom" : photoRect(style) ? ", click the photo square to add a photo" : ""}.`}
-              className="relative h-[400px] touch-none rounded-lg outline-none select-none focus-visible:ring-2 focus-visible:ring-ring sm:h-[500px]"
+              // A vertical swipe scrolls the page, a sideways one turns the
+              // card; while framing, the photo takes the finger both ways
+              className={`relative h-[400px] rounded-lg outline-none select-none focus-visible:ring-2 focus-visible:ring-ring sm:h-[500px] ${framing && photo ? "touch-none" : "touch-pan-y"}`}
               style={{ cursor }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onClick={onClick}
               onPointerLeave={() => {
                 spin.current.hover = null;
               }}
