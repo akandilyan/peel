@@ -232,11 +232,12 @@ export function IdBadgePreview({
   // types into is hidden, so the browser doesn't scroll to it: while the name
   // is edited, keep the bottom of the stage — the card with the name — right
   // above the keyboard. Only with a keyboard up (the visual viewport shrinks),
-  // so a click on desktop never moves the page.
-  const editingName = focus !== null;
+  // so a click on desktop never moves the page. Moving to the other line
+  // (Enter) makes iOS scroll to that hidden input on its own: once that
+  // settles, the card is put back.
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!editingName || !vv) return;
+    if (!focus || !vv) return;
     const keepInView = () => {
       const el = stage.current;
       if (!el || window.innerHeight - vv.height < 120) return;
@@ -247,9 +248,13 @@ export function IdBadgePreview({
       if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: "smooth" });
     };
     keepInView();
+    const settled = setTimeout(keepInView, 350);
     vv.addEventListener("resize", keepInView);
-    return () => vv.removeEventListener("resize", keepInView);
-  }, [editingName]);
+    return () => {
+      clearTimeout(settled);
+      vv.removeEventListener("resize", keepInView);
+    };
+  }, [focus]);
 
   // The caret blinks while a field has focus; a change shows it at once
   // (syncSelection) and restarts the blink
