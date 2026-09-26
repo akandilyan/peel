@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Peel",
-  description: "Avride sticker generator",
+  description: "Print-ready decals, business cards, ID badges and lanyards for Avride",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

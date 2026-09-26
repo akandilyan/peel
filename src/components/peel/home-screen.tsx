@@ -39,8 +39,7 @@ export function HomeScreen({ onSelect }: { onSelect: (id: string) => void }) {
             What&apos;s new
           </h1>
           <p className="text-muted-foreground" style={{ fontSize: type.body }}>
-            Print-ready decals for Avride cars and robots: pick a decal, set the
-            numbers or how many you need, download a PDF.
+            Everything that carries the Avride logo, ready to print.
           </p>
           <p
             className="text-muted-foreground tabular-nums"

@@ -131,9 +131,9 @@ export const badgeStyles: Record<BadgeStyle, BadgeStyleSpec> = {
   avride: { name: "Avride", ...akzidenz, top: 660, photoTop: 200 },
   // 20 px higher, the HireArt mark at 776
   hireart: { name: "HireArt", ...akzidenz, top: 640, photoTop: 180, hireart: true },
-  // CHAOS16 at 96 px, 100% leading, down to 48 for long names; VISITOR the
-  // same size, 11 px under the name; the block centered on the card (at 279
-  // with two lines)
+  // CHAOS16 at 96 px, 100% leading, down to 48 for long names; VISITOR at 86
+  // px right under the name; the block centered on the card (at 289 with two
+  // lines)
   visitor: {
     name: "Visitor",
     font: chaosData as unknown as GlyphFont,
@@ -142,8 +142,8 @@ export const badgeStyles: Record<BadgeStyle, BadgeStyleSpec> = {
     minFit: 0.5,
     width: 440,
     capitals: true,
-    top: FRAME.height / 2 - (2 * 96 + 11 + 96) / 2,
-    label: { text: "VISITOR", size: 96, leading: 96, gap: 11 },
+    top: FRAME.height / 2 - (2 * 96 + 86) / 2,
+    label: { text: "VISITOR", size: 86, leading: 86, gap: 0 },
     photoTop: null,
   },
 };
