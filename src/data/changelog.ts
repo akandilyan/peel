@@ -15,6 +15,26 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.5.0",
+    date: "2026-09-26",
+    changes: [
+      "ID badge: a 3D card you edit in place — type your name on it, drop your photo and frame it; get a PDF for the plastic card printer with the same design on both sides.",
+      "Lanyard: the Avride strap in a light and a dark design, in 3D on a snap hook — turn it to see both sides, and download the print file for sublimation.",
+    ],
+    decals: ["team-id-badge", "team-lanyard"],
+  },
+  {
+    version: "0.4.0",
+    date: "2026-09-26",
+    changes: [
+      "Team section for print beyond vehicles.",
+      "Business card: enter your details, get a print-ready two-sided PDF with a QR code that saves your contact.",
+      "Business card preview in 3D: drag to turn the card, or flip it with Front / Back.",
+      "Business card designs: Classic, Lavender (PMS 2705 C on both sides) and Solid lavender (PMS 2715 C); rounded or square corners.",
+    ],
+    decals: ["team-business-card"],
+  },
+  {
     version: "0.3.0",
     date: "2026-09-25",
     changes: [

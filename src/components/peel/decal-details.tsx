@@ -39,7 +39,7 @@ export function detailsRows(
 }
 
 // CUSTOM: two-line value — main text and a small caption (Fluid scale, caption)
-function SizeValue({ main, sub }: SizeInfo) {
+export function SizeValue({ main, sub }: SizeInfo) {
   const type = useTypeScale();
   return (
     <div className="flex flex-col gap-0.5">
@@ -76,28 +76,44 @@ export function staticSize(decal: Decal, units: Units): SizeInfo {
   };
 }
 
-// CUSTOM: section heading — Fluid has no component; size and weight from the scale.
-function Section({ title, children }: { title: string; children: ReactNode }) {
+// CUSTOM: section heading — Fluid has no component; size and weight from the
+// scale. Shared by Details and the business card's field groups.
+export function SectionHeading({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const type = useTypeScale();
   return (
+    <h2
+      className={className}
+      style={{
+        fontSize: type.title,
+        fontVariationSettings: fontWeights.semibold,
+      }}
+    >
+      {children}
+    </h2>
+  );
+}
+
+export function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
     <section className="flex flex-col gap-3">
-      <h2
-        className="px-1"
-        style={{
-          fontSize: type.title,
-          fontVariationSettings: fontWeights.semibold,
-        }}
-      >
-        {title}
-      </h2>
+      {/* The card padding and border (16 + 1 px): the text lines up with the
+          text inside the cards above */}
+      <SectionHeading className="px-[17px]">{title}</SectionHeading>
       {children}
     </section>
   );
 }
 
 // Details is a «label — value» list without Table (Table's hover can't be turned off).
-// Styles come from Fluid only: row and text sizes from the scale (useSize), row
-// border as in TableRow (border-accent/40), colors are muted-foreground/foreground tokens.
+// Styles come from Fluid only: row and text sizes from the scale (useSize), the
+// divider is the border token at 60% (TableRow's border-accent/40 is meant for hover rows
+// and nearly vanishes on white), colors are muted-foreground/foreground tokens.
 export function DetailsTable({ rows }: { rows: [string, ReactNode][] }) {
   const size = useSize();
   return (
@@ -109,8 +125,10 @@ export function DetailsTable({ rows }: { rows: [string, ReactNode][] }) {
         {rows.map(([k, v]) => (
           <div
             key={k}
-            // Row padding as in TableCell: the height lands on the 36/28px scale
-            className={`grid grid-cols-[minmax(0,10rem)_1fr] items-baseline border-b border-accent/40 ${size.px} ${size.gap} ${size.variant === "compact" ? "py-[5px]" : "py-2"}`}
+            // Row padding as in TableCell: the height lands on the 36/28px scale.
+            // Sides as the section heading (card padding + border): labels start
+            // under the heading, in line with the text inside the cards above.
+            className={`grid grid-cols-[minmax(0,10rem)_1fr] items-baseline border-b border-border/60 px-[17px] ${size.gap} ${size.variant === "compact" ? "py-[5px]" : "py-2"}`}
           >
             <dt className="text-muted-foreground">{k}</dt>
             <dd className="text-foreground">{v}</dd>

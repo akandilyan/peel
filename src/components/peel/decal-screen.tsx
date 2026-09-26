@@ -12,6 +12,7 @@ import {
 import { InputField, InputGroup } from "@/components/ui/input-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import { decalFiles, decalsInOrder, type Decal } from "@/data/decals";
+import type { CardDesign, CardFields } from "@/lib/business-card";
 import {
   formatNumber,
   numberPresets,
@@ -26,6 +27,9 @@ import { formatSize } from "@/lib/units";
 import { withBase } from "@/lib/base-path";
 import { fontWeights } from "@/lib/font-weight";
 import { useTypeScale } from "@/lib/size-context";
+import { BusinessCardBody } from "./business-card-screen";
+import { IdBadgeBody, type BadgeState } from "./id-badge-screen";
+import { LanyardBody } from "./lanyard-screen";
 import { CopiesStepper } from "./copies-stepper";
 import { CopyLinkButton } from "./copy-link-button";
 import {
@@ -63,6 +67,14 @@ interface DecalScreenProps {
   /** Version of a decal with versions (light / dark); none — the first */
   variant?: string;
   onVariantChange: (variant: string) => void;
+  /** Business card details */
+  card: CardFields;
+  onCardChange: (card: CardFields) => void;
+  cardDesign: CardDesign;
+  onCardDesignChange: (design: CardDesign) => void;
+  /** ID badge name and photo */
+  badge: BadgeState;
+  onBadgeChange: (badge: BadgeState) => void;
   /** Go to an adjacent decal (arrows next to the title) */
   onSelect: (id: string) => void;
 }
@@ -73,6 +85,35 @@ const vehiclesLabel = (d: Decal) =>
 
 export function DecalScreen(props: DecalScreenProps) {
   const header = <ScreenHeader decal={props.decal} onSelect={props.onSelect} />;
+  if (props.decal.kind === "business-card")
+    return (
+      <BusinessCardBody
+        decal={props.decal}
+        fields={props.card}
+        onFieldsChange={props.onCardChange}
+        design={props.cardDesign}
+        onDesignChange={props.onCardDesignChange}
+        header={header}
+      />
+    );
+  if (props.decal.kind === "lanyard")
+    return (
+      <LanyardBody
+        decal={props.decal}
+        design={props.variant}
+        onDesignChange={props.onVariantChange}
+        header={header}
+      />
+    );
+  if (props.decal.kind === "id-badge")
+    return (
+      <IdBadgeBody
+        decal={props.decal}
+        badge={props.badge}
+        onBadgeChange={props.onBadgeChange}
+        header={header}
+      />
+    );
   return props.decal.kind === "generator" ? (
     <GeneratorBody {...props} header={header} />
   ) : (
@@ -149,7 +190,9 @@ function GeneratorBody({
   onModeChange,
   header,
 }: DecalScreenProps & { header: ReactNode }) {
-  const preset = numberPresets[decal.platform];
+  // Generators exist only for cars and robots
+  const platform = decal.platform as "car" | "robot";
+  const preset = numberPresets[platform];
   const build = useBuild();
   const per = perVehicle(decal);
 
@@ -257,7 +300,7 @@ function GeneratorBody({
                 exportDecals({
                   numbers,
                   preset,
-                  layer: NUMBER_LAYERS[decal.platform],
+                  layer: NUMBER_LAYERS[platform],
                   mode: effectiveMode,
                   copies: per,
                   prefix: decal.id,

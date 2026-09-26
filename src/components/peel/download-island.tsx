@@ -55,7 +55,8 @@ export function DownloadIsland({
 }: {
   /** Version row (light / dark) above the quantity, for decals with versions */
   variant?: ReactNode;
-  quantity: ReactNode;
+  /** Numbers or cars; none — nothing to count (business card) */
+  quantity?: ReactNode;
   /** Hint in small text under the quantity */
   caption?: string;
   items: number;

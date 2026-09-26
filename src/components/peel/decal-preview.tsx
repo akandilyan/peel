@@ -3,7 +3,6 @@
 import { useId, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { surfaceClasses } from "@/lib/surface-classes";
 import previewSvgs from "@/data/preview-svgs.json";
 import { withBase } from "@/lib/base-path";
 import type { NumberLayout } from "@/lib/glyph-layout";
@@ -16,8 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Decal preview: native CardGroup and Card from Fluid.
-// CUSTOM: card on a Fluid surface (surface-1) instead of a border; the decal
+// Decal preview: native CardGroup (outlined) and Card from Fluid.
+// CUSTOM: the decal
 // artwork (SVG in millimeters), size in small text next to the title,
 // pager centered.
 
@@ -54,11 +53,12 @@ export function DecalPreview({ count, getPage }: DecalPreviewProps) {
   const [index, setIndex] = useState(0);
   const i = Math.min(index, Math.max(0, count - 1));
   const page = getPage(i);
-  // Card background is the lightest Fluid surface (surface-1, background + level shadow)
-  const surface = surfaceClasses(1);
 
   return (
-    <CardGroup fluidHover={false} className={`rounded-xl ${surface}`}>
+    // Native outlined card, as the field groups on the business card page: the
+    // page is surface-1 itself, so a surface card would show only a faint ring.
+    // The 1 px border also puts the text where Details (px-[17px]) starts.
+    <CardGroup fluidHover={false} border="outlined" className="rounded-xl">
       <Card>
         <CardHeader>
           <div className="flex items-baseline justify-between gap-4">

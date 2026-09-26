@@ -109,24 +109,27 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Text, surface and line colors as on fluidfunctionalism.com (Base theme):
+     background, foreground, card, muted, accent, destructive, border, input, ring */
+  /* The page is surface level 1, not white */
+  --background: #FAFAFA;
+  --foreground: #171717;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: #171717;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --muted: #F4F4F5;
+  --muted-foreground: #737373;
+  --accent: #E5E5E5;
+  --accent-foreground: #171717;
+  --destructive: #EF4444;
+  --border: color-mix(in oklab, #171717 12%, transparent);
+  --input: #E5E5E5;
+  --ring: #E5E5E5;
   --surface-1: #FAFAFA;
   --surface-2: #FCFCFC;
   --surface-3: #FFFFFF;
@@ -153,24 +156,26 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  /* As on fluidfunctionalism.com, dark */
+  --background: #171717;
+  --foreground: #F5F5F5;
+  /* As on fluidfunctionalism.com: a step above the #171717 page */
+  --card: #252525;
+  --card-foreground: #F5F5F5;
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --muted: #1E1E1E;
+  --muted-foreground: #A3A3A3;
+  --accent: #525252;
+  --accent-foreground: #F5F5F5;
+  --destructive: #F87171;
+  --border: color-mix(in oklab, #F5F5F5 12%, transparent);
+  --input: #404040;
+  --ring: #404040;
   --surface-1: #171717;
   --surface-2: #1E1E1E;
   --surface-3: #252525;

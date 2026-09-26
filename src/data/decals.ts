@@ -3,10 +3,13 @@
 // (ArtBox of the source PDF; for Unlock with live text — measured from the SVG), cutMm —
 // the cut line added when rebuilding.
 
-export type Platform = "car" | "robot";
-export type DecalKind = "generator" | "static";
+/** Sidebar tabs: decals for cars and robots, team print (ID badges, lanyards, business cards). */
+export type Platform = "car" | "robot" | "team";
+/** generator — numbers, static — a ready file, business-card and id-badge — a
+ *  form, lanyard — merch with designs to pick from. */
+export type DecalKind = "generator" | "static" | "business-card" | "id-badge" | "lanyard";
 /** Decal type — a group in the navigation. */
-export type DecalCategory = "id" | "logo" | "service" | "wrap";
+export type DecalCategory = "id" | "logo" | "service" | "wrap" | "card";
 /** Navigation group: base elements or a partner program
  *  (uber — decals for Uber robotaxis). */
 export type DecalGroup = "base" | "uber";
@@ -83,6 +86,7 @@ export interface Decal {
 export const platforms: { id: Platform; name: string }[] = [
   { id: "car", name: "Car" },
   { id: "robot", name: "Robot" },
+  { id: "team", name: "Team" },
 ];
 
 const categories: { id: DecalCategory; name: string }[] = [
@@ -90,6 +94,7 @@ const categories: { id: DecalCategory; name: string }[] = [
   { id: "id", name: "IDs" },
   { id: "logo", name: "Logos" },
   { id: "service", name: "Service notices" },
+  { id: "card", name: "Cards" },
 ];
 
 export const allDecals: Decal[] = [
@@ -415,6 +420,54 @@ export const allDecals: Decal[] = [
     placement: "Back",
     print: "Black",
   },
+  {
+    id: "team-id-badge",
+    platform: "team",
+    name: "ID badge",
+    description: "Your Avride ID badge with your photo, for the plastic card printer.",
+    kind: "id-badge",
+    category: "card",
+    group: "base",
+    // CR80 (ISO/IEC 7810 ID-1), portrait; the layout is in src/lib/id-badge.ts
+    widthMm: 53.98,
+    heightMm: 85.6,
+    previews: [],
+    production: "print",
+    // 30 mil (0.76 mm) is the standard CR80 thickness
+    material: "White PVC card, 30 mil",
+  },  {
+    id: "team-lanyard",
+    platform: "team",
+    name: "Lanyard",
+    description: "The Avride lanyard for ID badges, in a light or a dark design.",
+    kind: "lanyard",
+    category: "card",
+    group: "base",
+    // The strap, 20 × 900 mm flat before sewing (STRAP_WIDTH_MM, STRAP_LENGTH_MM)
+    widthMm: 20,
+    heightMm: 900,
+    previews: [],
+    production: "print",
+    material: "White polyester tape",
+  },
+  {
+    id: "team-business-card",
+    platform: "team",
+    name: "Business card",
+    description: "Your Avride business card with a QR code that saves your contact.",
+    kind: "business-card",
+    category: "card",
+    group: "base",
+    // 3.5 × 2 in, the US standard; the layout is in src/lib/business-card.ts
+    widthMm: 88.9,
+    heightMm: 50.8,
+    previews: [],
+    production: "print",
+    // Coated for the Pantone C inks, matte, 0.4 mm (the 3D preview's thickness)
+    material: "16 pt matte coated cover",
+    // Print inks depend on the design: cardStyles in src/lib/business-card.ts
+  },
+
 ];
 
 /** Preview and PDF of a decal, or of its version (the first one by default). */

@@ -37,3 +37,8 @@ export function formatSize(
       : formatLength(v, units, mmDigits);
   return `${side(w)} × ${side(h)} ${units}`;
 }
+
+/** One length with its units: «15 mm», «0.59 in». */
+export function formatLengthWithUnits(mm: number, units: Units, mmDigits = 0): string {
+  return `${formatLength(mm, units, mmDigits)} ${units}`;
+}

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { changelog, latest } from "@/data/changelog";
-import { decals } from "@/data/decals";
+import { decals, platforms } from "@/data/decals";
 import { fontWeights } from "@/lib/font-weight";
 import { useSize, useTypeScale } from "@/lib/size-context";
 import { ScreenLayout } from "./screen-layout";
@@ -91,7 +91,7 @@ export function HomeScreen({ onSelect }: { onSelect: (id: string) => void }) {
                     size="compact"
                     onClick={() => onSelect(d.id)}
                   >
-                    {`${d.name} · ${d.platform === "car" ? "Car" : "Robot"}${d.group === "uber" ? " · Uber" : ""}`}
+                    {`${d.name} · ${platforms.find((p) => p.id === d.platform)?.name}${d.group === "uber" ? " · Uber" : ""}`}
                   </Button>
                 ))}
               </div>
