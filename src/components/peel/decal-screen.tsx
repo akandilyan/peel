@@ -253,7 +253,7 @@ function GeneratorBody({
         <DetailsTable
           rows={detailsRows(decal, {
             main: inkLabel,
-            // The digits themselves are cut; the cut frame follows the sheet edge
+            // Only the digits are cut; there is no cut line along the sheet edge
             sub: `Cut along digits · Sheet ${sizeLabel}`,
           })}
         />

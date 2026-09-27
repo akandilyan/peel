@@ -2,8 +2,9 @@
 // Outlines are stroked with the Separation spot color "CutContour" (fallback
 // DeviceCMYK 0/100/0/0), 0.25 pt, no fill, overprint on (what RIPs expect;
 // it was off in the plugin).
-// Layers (Optional Content): the number and the cut frame are separate. In a
-// multi-page file every page has a bookmark with its number.
+// Only the digits are cut — no frame along the sheet edge. The number sits in
+// its own layer (Optional Content). In a multi-page file every page has a
+// bookmark with its number.
 
 import {
   PDFDocument,
@@ -79,15 +80,10 @@ function pathOps(d: string, x: number, y: number, s: number): string[] {
   return ops;
 }
 
-function frameOps(f: PdfPageLayout["frame"]): string[] {
-  return [`${n(f.x)} ${n(f.y)} ${n(f.width)} ${n(f.height)} re`];
-}
-
 interface Resources {
   cs: PDFRef;
   gs: PDFRef;
   text: PDFRef;
-  frame: PDFRef;
 }
 
 // Shared document resources: spot color, graphics state, layers.
@@ -114,18 +110,17 @@ function resources(doc: PDFDocument, ink: Ink, layerName: string): Resources {
   const gs = ctx.register(
     ctx.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1, CA: 1, ca: 1 }),
   );
-  const layer = (name: string) =>
-    ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of(name) }));
-  const text = layer(layerName);
-  const frame = layer("CUT_FRAME");
+  const text = ctx.register(
+    ctx.obj({ Type: "OCG", Name: PDFString.of(layerName) }),
+  );
   doc.catalog.set(
     PDFName.of("OCProperties"),
     ctx.obj({
-      OCGs: [text, frame],
-      D: { Order: [text, frame], ON: [text, frame], BaseState: "ON" },
+      OCGs: [text],
+      D: { Order: [text], ON: [text], BaseState: "ON" },
     }),
   );
-  return { cs, gs, text, frame };
+  return { cs, gs, text };
 }
 
 function addDecalPage(
@@ -143,7 +138,7 @@ function addDecalPage(
     ctx.obj({
       ColorSpace: { CS0: res.cs },
       ExtGState: { GS0: res.gs },
-      Properties: { MC0: res.text, MC1: res.frame },
+      Properties: { MC0: res.text },
     }),
   );
   const stroke = [
@@ -155,15 +150,6 @@ function addDecalPage(
     pathOps(it.d, it.x, it.y, page.scale),
   );
   const body = ["/OC /MC0 BDC", "q", ...stroke, ...glyphs, "S", "Q", "EMC"];
-  body.push(
-    "/OC /MC1 BDC",
-    "q",
-    ...stroke,
-    ...frameOps(page.frame),
-    "S",
-    "Q",
-    "EMC",
-  );
   p.node.set(
     PDFName.of("Contents"),
     ctx.register(ctx.flateStream(body.join("\n") + "\n")),

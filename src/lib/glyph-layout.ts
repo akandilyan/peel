@@ -98,8 +98,6 @@ export interface PdfPageLayout {
   /** Points per font unit. */
   scale: number;
   items: { d: string; x: number; y: number }[];
-  /** Cut frame along the decal edge (inset 0, no rounding, as in the Car preset). */
-  frame: { x: number; y: number; width: number; height: number };
 }
 
 export function layoutNumberPdf(
@@ -140,6 +138,5 @@ export function layoutNumberPdf(
       x: originX + p.x * scale,
       y: baseline,
     })),
-    frame: { x: 0, y: 0, width, height },
   };
 }

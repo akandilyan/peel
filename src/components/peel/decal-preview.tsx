@@ -149,8 +149,8 @@ function Sticker({ page }: { page: PreviewPage }) {
       <svg
         viewBox={`0 0 ${w} ${h}`}
         className="h-full w-full"
-        // The cut frame sits on the decal edge: without this the outer half of the line
-        // is clipped by the SVG bounds and the frame looks thinner than the digit outlines
+        // The sheet boundary sits on the decal edge: without this the outer half of the
+        // line is clipped by the SVG bounds
         overflow="visible"
         role="img"
         aria-label={`${page.label}, ${w} × ${h} mm`}
@@ -182,7 +182,7 @@ function Sticker({ page }: { page: PreviewPage }) {
           <InlineSvg key={content.src} src={content.src} w={w} h={h} />
         )}
         {content.type === "number" && (
-          // As in the PDF: digit outlines and the cut frame are one CutContour line
+          // As in the PDF: only the digit outlines are cut, as a CutContour line
           <g
             fill="none"
             stroke={CUT}
@@ -197,7 +197,6 @@ function Sticker({ page }: { page: PreviewPage }) {
                 vectorEffect="non-scaling-stroke"
               />
             ))}
-            <rect width={w} height={h} vectorEffect="non-scaling-stroke" />
           </g>
         )}
         {/* Sheet boundary (PDF page) — thin dashed line in the caption color */}
