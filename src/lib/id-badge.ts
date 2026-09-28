@@ -40,8 +40,9 @@ export const LOGO_COLOR = "#9885ff";
 /** Logo color in the PDF. Card printers take RGB and convert it to the YMC
  *  panels through the driver's profile; light violets drift (mostly toward
  *  blue). Pick the swatch that matches LOGO_COLOR on a printed test card
- *  (scripts/logo-color-test.mts) and put its value here. */
-export const LOGO_PRINT_COLOR = "#9885ff";
+ *  (scripts/logo-color-test.mts) and put its value here. #816ce3 is the
+ *  closest to LOGO_COLOR on the Badgy100 test print. */
+export const LOGO_PRINT_COLOR = "#816ce3";
 
 /** Avride logo: the paths sit in a 386 × 96 px box (the logo component's), the
  *  logo's ink 76 px from the top, centered. */
