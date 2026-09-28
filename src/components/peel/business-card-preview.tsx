@@ -4,8 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
-  type PointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -19,7 +17,8 @@ import {
 import { TabsSubtle, TabsSubtleItem } from "@/components/ui/tabs-subtle";
 import { CARD } from "@/lib/business-card";
 import type { CardScene } from "./business-card-3d";
-import { newSpin, sideAt, yawFor, type Side } from "./business-card-spin";
+import type { Side } from "./business-card-spin";
+import { useReducedMotion, useTurnGesture, useWebgl } from "./use-card-stage";
 
 // Business card preview on native Fluid parts, like DecalPreview: CardGroup /
 // Card (on the brand backdrop, see below), title and size in the header, Front / Back tabs (TabsSubtle)
@@ -37,28 +36,6 @@ export const BACKDROP =
 
 /** Max tilt up and down while dragging, radians. */
 const MAX_PITCH = 0.5;
-/** A flick keeps turning for about this long before the card settles, s. */
-const FLICK = 0.12;
-
-let webgl: boolean | undefined;
-const noSubscribe = () => () => {};
-function webglAvailable(): boolean {
-  if (webgl === undefined) {
-    try {
-      webgl = Boolean(document.createElement("canvas").getContext("webgl2"));
-    } catch {
-      webgl = false;
-    }
-  }
-  return webgl;
-}
-
-const REDUCED = "(prefers-reduced-motion: reduce)";
-function subscribeReduced(cb: () => void) {
-  const mq = window.matchMedia(REDUCED);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-}
 
 export function BusinessCardPreview({
   label,
@@ -81,17 +58,17 @@ export function BusinessCardPreview({
   footerEnd?: ReactNode;
 }) {
   // null on the server: the flat preview renders first
-  const hasWebgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null);
-  const reducedMotion = useSyncExternalStore(
-    subscribeReduced,
-    () => window.matchMedia(REDUCED).matches,
-    () => false,
-  );
+  const hasWebgl = useWebgl();
+  const reducedMotion = useReducedMotion();
   const [side, setSide] = useState<Side>("front");
   // The 3D scene has drawn both sides — the flat preview steps aside
   const [ready, setReady] = useState(false);
+  const interactive = hasWebgl === true;
+  const { spin, handlers: turn, faceSide } = useTurnGesture({
+    maxPitch: MAX_PITCH,
+    enabled: interactive,
+  });
 
-  const spin = useRef(newSpin());
   const mount = useRef<HTMLDivElement>(null);
   const scene = useRef<CardScene | null>(null);
   // Latest sides and corners for a scene that loads after they change
@@ -118,7 +95,7 @@ export function BusinessCardPreview({
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [hasWebgl]);
+  }, [hasWebgl, spin]);
   useEffect(() => {
     sides.current = { front, back };
     scene.current?.setSides(front, back);
@@ -131,51 +108,8 @@ export function BusinessCardPreview({
     scene.current?.setReducedMotion(reducedMotion);
   }, [reducedMotion, ready]);
 
-  const drag = useRef({ x: 0, y: 0, t: 0, velocity: 0 });
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    spin.current.dragging = true;
-    drag.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, velocity: 0 };
-  };
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const s = spin.current;
-    const rect = e.currentTarget.getBoundingClientRect();
-    s.hover =
-      e.pointerType === "mouse"
-        ? {
-            x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
-            y: ((e.clientY - rect.top) / rect.height) * 2 - 1,
-          }
-        : null;
-    if (!s.dragging) return;
-    const d = drag.current;
-    // Dragging across the whole preview turns the card by about 200°
-    const dYaw = ((e.clientX - d.x) / rect.width) * Math.PI * 1.1;
-    s.targetYaw += dYaw;
-    if (e.pointerType === "mouse")
-      s.targetPitch = Math.max(
-        -MAX_PITCH,
-        Math.min(MAX_PITCH, s.targetPitch + ((e.clientY - d.y) / rect.width) * Math.PI),
-      );
-    d.velocity = dYaw / (Math.max(1, e.timeStamp - d.t) / 1000);
-    d.x = e.clientX;
-    d.y = e.clientY;
-    d.t = e.timeStamp;
-  };
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    const s = spin.current;
-    if (!s.dragging) return;
-    s.dragging = false;
-    // A pause before release means no flick
-    const velocity = e.timeStamp - drag.current.t > 80 ? 0 : drag.current.velocity;
-    const projected = s.targetYaw + velocity * FLICK;
-    s.targetYaw = yawFor(sideAt(projected), projected);
-    s.targetPitch = 0;
-  };
   const flipTo = (next: Side) => {
-    const s = spin.current;
-    s.targetYaw = yawFor(next, s.targetYaw);
-    s.targetPitch = 0;
+    faceSide(next);
     setSide(next);
   };
 
@@ -186,8 +120,6 @@ export function BusinessCardPreview({
       dangerouslySetInnerHTML={{ __html: markup }}
     />
   );
-  const interactive = hasWebgl === true;
-
   return (
     // CUSTOM: the whole preview card sits on the brand backdrop instead of
     // surface-1, one background for the header, the stage and the tabs
@@ -213,13 +145,7 @@ export function BusinessCardPreview({
             role="img"
             aria-label={`${label}: business card, ${side} side${interactive ? ". Drag to turn it." : ""}`}
             className={`relative h-[220px] touch-pan-y sm:h-[300px] select-none ${interactive ? "cursor-grab active:cursor-grabbing" : ""}`}
-            onPointerDown={interactive ? onPointerDown : undefined}
-            onPointerMove={interactive ? onPointerMove : undefined}
-            onPointerUp={interactive ? onPointerUp : undefined}
-            onPointerCancel={interactive ? onPointerUp : undefined}
-            onPointerLeave={() => {
-              spin.current.hover = null;
-            }}
+            {...turn}
           >
             {/* Flat sides: only without WebGL, both at once. With it the stage
                 stays empty until the 3D card has drawn and then fades in —

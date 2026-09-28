@@ -425,6 +425,25 @@ export function fitField(
   return v;
 }
 
+/** A full name pasted into the first name, over its selection: the last word
+ *  is the last name, the rest (with what the field keeps around the
+ *  selection) the first name; spaces collapsed. Null for a single word — it
+ *  pastes as usual. Raw: still to go through typeableText. */
+export function splitPastedName(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  pasted: string,
+): BadgeName | null {
+  const text = pasted.trim().replace(/\s+/g, " ");
+  const cut = text.lastIndexOf(" ");
+  if (cut < 0) return null;
+  return {
+    first: value.slice(0, selectionStart) + text.slice(0, cut) + value.slice(selectionEnd),
+    last: text.slice(cut + 1),
+  };
+}
+
 /** Placeholders of empty lines while the name is typed, as in the template. */
 export const namePlaceholder: BadgeName = { first: "Name", last: "Surname" };
 
@@ -497,6 +516,70 @@ export function clampCrop(photo: BadgePhoto, crop: PhotoCrop): PhotoCrop {
  *  where the face usually is. */
 export function defaultCrop(photo: BadgePhoto): PhotoCrop {
   return clampCrop(photo, { zoom: 1, x: 0.5, y: 0.4 });
+}
+
+/** The photo dragged on the card: dx, dy mm over a square of sizeMm; it
+ *  follows the pointer. */
+export function dragCrop(
+  photo: BadgePhoto,
+  crop: PhotoCrop,
+  dx: number,
+  dy: number,
+  sizeMm: number,
+): PhotoCrop {
+  const k = cropRect(photo, crop).side / sizeMm;
+  return clampCrop(photo, {
+    ...crop,
+    x: crop.x - (dx * k) / photo.width,
+    y: crop.y - (dy * k) / photo.height,
+  });
+}
+
+/** Zoomed to zoom around a point of the square — u, v from its center,
+ *  −0.5…0.5 — that stays put, as a pinch does. */
+export function zoomCropAt(
+  photo: BadgePhoto,
+  crop: PhotoCrop,
+  zoom: number,
+  u: number,
+  v: number,
+): PhotoCrop {
+  const z = Math.min(MAX_ZOOM, Math.max(1, zoom));
+  const before = cropRect(photo, crop).side;
+  const after = before * (crop.zoom / z);
+  return clampCrop(photo, {
+    zoom: z,
+    x: crop.x + (u * (before - after)) / photo.width,
+    y: crop.y + (v * (before - after)) / photo.height,
+  });
+}
+
+/** Arrow keys move the photo by this share of the square (five times with
+ *  Shift); + and − zoom by this factor. */
+const KEY_STEP = 0.02;
+const KEY_ZOOM = 1.1;
+
+/** The framing after a key on the stage, or null for a key that doesn't frame. */
+export function keyCrop(
+  photo: BadgePhoto,
+  crop: PhotoCrop,
+  key: string,
+  shift: boolean,
+): PhotoCrop | null {
+  const step = KEY_STEP * cropRect(photo, crop).side * (shift ? 5 : 1);
+  const moves: Record<string, [number, number]> = {
+    ArrowLeft: [step, 0],
+    ArrowRight: [-step, 0],
+    ArrowUp: [0, step],
+    ArrowDown: [0, -step],
+  };
+  let next: PhotoCrop | null = null;
+  if (moves[key]) {
+    const [dx, dy] = moves[key];
+    next = { ...crop, x: crop.x + dx / photo.width, y: crop.y + dy / photo.height };
+  } else if (key === "+" || key === "=") next = { ...crop, zoom: crop.zoom * KEY_ZOOM };
+  else if (key === "-") next = { ...crop, zoom: crop.zoom / KEY_ZOOM };
+  return next && clampCrop(photo, next);
 }
 
 /** A face found on the photo, in photo pixels. */
@@ -577,32 +660,6 @@ export function faceCrop(photo: BadgePhoto, face: PhotoFace): PhotoCrop {
     x: (face.headX + shift) / photo.width,
     y: (squareTop + side / 2) / photo.height,
   });
-}
-
-/** What's off with a photo for the badge, however it's framed: the head runs
- *  off the photo's edge (cut); the face is so small the square gets blurry
- *  before it's big enough (small: under ~70% of its size at MIN_DPI); the
- *  head is so big no framing leaves room under the chin (tight). */
-export type FramingIssue = "cut" | "small" | "tight";
-
-export function framingIssue(photo: BadgePhoto, face: PhotoFace): FramingIssue | null {
-  const H = headHeight(face);
-  const chin = face.eyes.y + H / 2;
-  // The skull, without the hair: a head is about 0.7 of its height wide
-  const crown = face.eyes.y - H / 2;
-  const slack = 0.08 * H;
-  if (
-    crown < -slack ||
-    chin > photo.height + slack ||
-    face.headX - 0.35 * H < -slack ||
-    face.headX + 0.35 * H > photo.width + slack
-  )
-    return "cut";
-  const top = face.hairTop ?? face.eyes.y - 0.58 * H;
-  const wanted = (chin - top) / HEAD_FRAMING.head;
-  if (wanted < 0.7 * (PHOTO.sizeMm / 25.4) * MIN_DPI) return "small";
-  if (wanted > 1.4 * Math.min(photo.width, photo.height)) return "tight";
-  return null;
 }
 
 /** The part of the photo in the square, in photo pixels. */

@@ -5,7 +5,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type DragEvent,
   type KeyboardEvent,
   type PointerEvent,
@@ -20,24 +19,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TabsSubtle, TabsSubtleItem } from "@/components/ui/tabs-subtle";
-import { AnimatePresence, motion } from "framer-motion";
-import { Elevated } from "@/lib/elevated";
-import { spring } from "@/lib/springs";
 import {
   BADGE,
-  MAX_ZOOM,
   badgeStyles,
+  dragCrop,
+  keyCrop,
+  zoomCropAt,
   nameZone,
   photoRect,
-  clampCrop,
-  cropRect,
   exampleName,
   inputIndex,
   layoutNameLines,
   namePlaceholder,
   printedIndex,
   printedText,
-  typeableText,
   type BadgeField,
   type BadgeName,
   type BadgePhoto,
@@ -45,41 +40,13 @@ import {
   type PhotoCrop,
 } from "@/lib/id-badge";
 import { drawBadge, type BadgeDrawing } from "@/lib/id-badge-canvas";
-import { Slider } from "@/components/ui/slider";
 import { withBase } from "@/lib/base-path";
 import type { CardPoint, CardScene, CardSpec } from "./business-card-3d";
 import { BACKDROP } from "./business-card-preview";
-import { newSpin, sideAt, yawFor } from "./business-card-spin";
-
-/** The framing toolbar's surface, animated in and out */
-const MotionElevated = motion.create(Elevated);
-
-/** 0…1 easing toward on (1) or off (0) in about ms each way: ease-out on the
- *  way up, ease-in on the way down; a jump with reduced motion. For states
- *  drawn in the card texture, where CSS transitions don't reach. */
-function useEase(on: boolean, ms: number, reduced: boolean) {
-  const [value, setValue] = useState(on ? 1 : 0);
-  const now = useRef(on ? 1 : 0);
-  useEffect(() => {
-    const target = on ? 1 : 0;
-    let raf = 0;
-    let last = performance.now();
-    const step = (t: number) => {
-      const dt = t - last;
-      last = t;
-      const from = now.current;
-      const next = reduced
-        ? target
-        : from + Math.sign(target - from) * Math.min(Math.abs(target - from), dt / ms);
-      now.current = next;
-      setValue(target ? 1 - (1 - next) ** 2 : next ** 2);
-      if (next !== target) raf = requestAnimationFrame(step);
-    };
-    if (now.current !== target) raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [on, ms, reduced]);
-  return value;
-}
+import { hoverAt, newSpin, releaseTurn, sideAt, turnBy, yawFor } from "./business-card-spin";
+import { NAME_FIELDS, NameInputs } from "./id-badge-name-inputs";
+import { PhotoToolbar } from "./id-badge-photo-toolbar";
+import { useEase, useReducedMotion, useWebgl } from "./use-card-stage";
 
 // ID badge preview, the business card's 3D card on native Fluid parts (CardGroup /
 // Card on the brand backdrop, title and size in the header, controls in the
@@ -121,18 +88,10 @@ const BADGE_CARD: CardSpec = {
 
 const STYLES = Object.keys(badgeStyles) as BadgeStyle[];
 
-const FIELDS: { key: BadgeField; label: string; autoComplete: string }[] = [
-  { key: "first", label: "First name", autoComplete: "given-name" },
-  { key: "last", label: "Last name", autoComplete: "family-name" },
-];
-
 const MAX_PITCH = 0.5;
-const FLICK = 0.12;
 /** Pointer travel that turns a click into a drag, px. */
 const CLICK_SLOP = 4;
 const BLINK_MS = 530;
-/** Arrow keys move the photo by this share of the square. */
-const KEY_STEP = 0.02;
 
 type Zone = "photo" | "name" | "card" | "none";
 
@@ -147,26 +106,6 @@ function zoneOf(p: CardPoint | null, style: BadgeStyle): Zone {
     return "photo";
   if (inside(p, { x: name.x, y: name.y, w: name.width, h: name.height })) return "name";
   return "card";
-}
-
-let webgl: boolean | undefined;
-const noSubscribe = () => () => {};
-function webglAvailable(): boolean {
-  if (webgl === undefined) {
-    try {
-      webgl = Boolean(document.createElement("canvas").getContext("webgl2"));
-    } catch {
-      webgl = false;
-    }
-  }
-  return webgl;
-}
-
-const REDUCED = "(prefers-reduced-motion: reduce)";
-function subscribeReduced(cb: () => void) {
-  const mq = window.matchMedia(REDUCED);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
 }
 
 export function IdBadgePreview({
@@ -204,12 +143,8 @@ export function IdBadgePreview({
   /** Right of the version tabs: Clear all */
   footerEnd?: ReactNode;
 }) {
-  const hasWebgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null);
-  const reducedMotion = useSyncExternalStore(
-    subscribeReduced,
-    () => window.matchMedia(REDUCED).matches,
-    () => false,
-  );
+  const hasWebgl = useWebgl();
+  const reducedMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
   const spin = useRef(newSpin());
   const sceneEl = useRef<HTMLDivElement>(null);
@@ -229,7 +164,7 @@ export function IdBadgePreview({
   // card): its add-photo button eases up, drawn in the texture
   const [overAdd, setOverAdd] = useState(false);
   const addHover = useEase((overAdd || dropTarget) && !photo, 150, reducedMotion);
-  // The selected photo shows the rest of itself over the card, easing in
+  // The selected photo's line around it fades in
   const selected = useEase(framing && Boolean(photo), 100, reducedMotion);
   // A new photo starts framing at once: it usually needs moving and zooming
   const [framedUrl, setFramedUrl] = useState(photo?.url);
@@ -314,8 +249,8 @@ export function IdBadgePreview({
   const empty = !printedText(name.first, style) && !printedText(name.last, style);
   const specs =
     !editing && empty
-      ? FIELDS.map((f) => ({ field: f.key, text: exampleName[f.key], hint: true }))
-      : FIELDS.filter((f) => f.key === "first" || editing || printedText(name.last, style)).map(
+      ? NAME_FIELDS.map((f) => ({ field: f.key, text: exampleName[f.key], hint: true }))
+      : NAME_FIELDS.filter((f) => f.key === "first" || editing || printedText(name.last, style)).map(
           (f) =>
             printedText(name[f.key], style)
               ? { field: f.key, text: name[f.key] }
@@ -517,29 +452,14 @@ export function IdBadgePreview({
     const s = spin.current;
     const g = gesture.current;
     const rect = e.currentTarget.getBoundingClientRect();
-    s.hover =
-      e.pointerType === "mouse"
-        ? {
-            x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
-            y: ((e.clientY - rect.top) / rect.height) * 2 - 1,
-          }
-        : null;
+    s.hover = hoverAt(e, rect);
     if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > CLICK_SLOP) g.moved = true;
 
     if (g.mode === "photo" && photo) {
       const p = pick(e.clientX, e.clientY);
       const rect = photoRect(style);
-      if (p && g.last && rect) {
-        // The photo follows the pointer on the card: card mm → photo pixels
-        const k = cropRect(photo, crop).side / rect.sizeMm;
-        onCropChange(
-          clampCrop(photo, {
-            ...crop,
-            x: crop.x - ((p.x - g.last.x) * k) / photo.width,
-            y: crop.y - ((p.y - g.last.y) * k) / photo.height,
-          }),
-        );
-      }
+      if (p && g.last && rect)
+        onCropChange(dragCrop(photo, crop, p.x - g.last.x, p.y - g.last.y, rect.sizeMm));
       g.last = p;
       return;
     }
@@ -550,18 +470,7 @@ export function IdBadgePreview({
       setCursor("grabbing");
     }
     if (g.mode === "turn") {
-      // Dragging across the whole stage turns the card by about 200°
-      const dYaw = ((e.clientX - g.x) / rect.width) * Math.PI * 1.1;
-      s.targetYaw += dYaw;
-      if (e.pointerType === "mouse")
-        s.targetPitch = Math.max(
-          -MAX_PITCH,
-          Math.min(MAX_PITCH, s.targetPitch + ((e.clientY - g.y) / rect.width) * Math.PI),
-        );
-      g.velocity = dYaw / (Math.max(1, e.timeStamp - g.t) / 1000);
-      g.x = e.clientX;
-      g.y = e.clientY;
-      g.t = e.timeStamp;
+      turnBy(s, g, e, rect, MAX_PITCH);
       return;
     }
     if (g.mode) return;
@@ -592,11 +501,7 @@ export function IdBadgePreview({
     if (mode === "turn") {
       s.dragging = false;
       setCursor("grab");
-      // A pause before release means no flick
-      const velocity = e.timeStamp - g.t > 80 ? 0 : g.velocity;
-      const projected = s.targetYaw + velocity * FLICK;
-      s.targetYaw = yawFor(sideAt(projected), projected);
-      s.targetPitch = 0;
+      releaseTurn(s, g, e);
     }
   };
 
@@ -633,16 +538,7 @@ export function IdBadgePreview({
       setFraming(true);
       const u = (at.x - PHOTO.x) / PHOTO.sizeMm - 0.5;
       const v = (at.y - PHOTO.y) / PHOTO.sizeMm - 0.5;
-      const zoom = Math.min(MAX_ZOOM, Math.max(1, c.zoom * Math.exp(-e.deltaY * 0.01)));
-      const before = cropRect(p, c).side;
-      const after = before * (c.zoom / zoom);
-      change(
-        clampCrop(p, {
-          zoom,
-          x: c.x + (u * (before - after)) / p.width,
-          y: c.y + (v * (before - after)) / p.height,
-        }),
-      );
+      change(zoomCropAt(p, c, c.zoom * Math.exp(-e.deltaY * 0.01), u, v));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -653,22 +549,10 @@ export function IdBadgePreview({
     if (e.target !== e.currentTarget) return;
     if (e.key === "Escape") stopFraming();
     if (!photo) return;
-    const step = KEY_STEP * cropRect(photo, crop).side * (e.shiftKey ? 5 : 1);
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [step, 0],
-      ArrowRight: [-step, 0],
-      ArrowUp: [0, step],
-      ArrowDown: [0, -step],
-    };
-    let next: PhotoCrop | null = null;
-    if (moves[e.key]) {
-      const [dx, dy] = moves[e.key];
-      next = { ...crop, x: crop.x + dx / photo.width, y: crop.y + dy / photo.height };
-    } else if (e.key === "+" || e.key === "=") next = { ...crop, zoom: crop.zoom * 1.1 };
-    else if (e.key === "-") next = { ...crop, zoom: crop.zoom / 1.1 };
+    const next = keyCrop(photo, crop, e.key, e.shiftKey);
     if (!next) return;
     e.preventDefault();
-    onCropChange(clampCrop(photo, next));
+    onCropChange(next);
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -741,143 +625,29 @@ export function IdBadgePreview({
                 ref={sceneEl}
                 className={`absolute inset-0 transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"}`}
               />
-              {/* CUSTOM: the framing toolbar floats over the stage's bottom
-                  while the photo is framed — native Slider and Buttons on an
-                  Elevated surface, as a dropdown's, made see-through (its own
-                  surface color at 50%, important over Elevated's opaque one)
-                  over a blur of the card and the backdrop; instead of the
-                  surface's ring and shadow, a hairline of the text color at
-                  12%, dark on the light theme and light on the dark one. It rises in and fades up, and out
-                  the same way, shorter; the opacity is on the blurred surface
-                  itself — on a parent it would switch the backdrop blur off
-                  until the fade ends. Its pointer and key events stay in it:
-                  the stage would turn the card or move the photo. */}
-              <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-center">
-                <AnimatePresence>
-                  {framing && photo && (
-                    <MotionElevated
-                      key="tools"
-                      initial={{ opacity: 0, y: reducedMotion ? 0 : 6, scale: reducedMotion ? 1 : 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1, transition: spring.moderate }}
-                      exit={{
-                        opacity: 0,
-                        y: reducedMotion ? 0 : 4,
-                        scale: reducedMotion ? 1 : 0.99,
-                        transition: { duration: spring.moderate.exit.duration },
-                      }}
-                      offset={2}
-                      shadowLevel={3}
-                      className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl border border-foreground/12 bg-surface-3/50! p-1 shadow-none! backdrop-blur-xl backdrop-saturate-150"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onPointerMove={(e) => e.stopPropagation()}
-                      onPointerUp={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      {/* Scrubber: pips at 5% steps would be 61 dots */}
-                      <div className="w-[130px]">
-                        <Slider
-                          variant="scrubber"
-                          label="Zoom"
-                          value={crop.zoom}
-                          min={1}
-                          max={MAX_ZOOM}
-                          step={0.05}
-                          formatValue={(v) => `${Math.round(v * 100)}%`}
-                          onChange={(v) =>
-                            onCropChange(clampCrop(photo, { ...crop, zoom: v as number }))
-                          }
-                        />
-                      </div>
-                      {photoTools}
-                    </MotionElevated>
-                  )}
-                </AnimatePresence>
-              </div>
-              {/* The name inputs: invisible, over the name block so the page
-                  doesn't jump when a phone keyboard opens; 16 px keeps iOS from
-                  zooming in */}
-              <div
-                className="pointer-events-none absolute inset-x-0 overflow-hidden opacity-0"
-                style={{ top: "75%", height: "10%" }}
+              <PhotoToolbar
+                photo={framing ? photo : null}
+                crop={crop}
+                onCropChange={onCropChange}
+                reducedMotion={reducedMotion}
               >
-                {FIELDS.map((f) => (
-                  <input
-                    key={f.key}
-                    ref={(el) => {
-                      inputs.current[f.key] = el;
-                    }}
-                    aria-label={f.label}
-                    name={f.key}
-                    autoComplete={f.autoComplete}
-                    spellCheck={false}
-                    className="absolute inset-x-0 top-0 text-[16px]"
-                    value={name[f.key]}
-                    onChange={(e) => {
-                      // Characters the badge can't print never get in: taken
-                      // out of the input right away, the caret stays in place
-                      const el = e.target;
-                      const value = typeableText(el.value, style);
-                      const rejected = value !== el.value;
-                      if (rejected) {
-                        // The card shakes its head
-                        spin.current.shakeAt = performance.now();
-                        const caret =
-                          typeableText(el.value.slice(0, el.selectionStart ?? el.value.length), style)
-                            .length;
-                        el.value = value;
-                        el.setSelectionRange(caret, caret);
-                      }
-                      onRejected(rejected);
-                      onNameChange({ ...latest.current.name, [f.key]: value });
-                      syncSelection(el);
-                    }}
-                    onSelect={(e) => syncSelection(e.currentTarget)}
-                    onFocus={(e) => {
-                      setFocus(f.key);
-                      syncSelection(e.currentTarget);
-                    }}
-                    onBlur={(e) => {
-                      // Moving between the two lines keeps editing
-                      const next = e.relatedTarget as HTMLElement | null;
-                      if (next && Object.values(inputs.current).includes(next as HTMLInputElement))
-                        return;
-                      setFocus(null);
-                    }}
-                    onKeyDown={(e) => onFieldKeyDown(f.key, e)}
-                    onPaste={(e) => {
-                      // A full name pasted into the first name splits: the
-                      // last word is the last name, the rest the first name;
-                      // the focus goes on to the last name. One word pastes
-                      // as usual.
-                      if (f.key !== "first") return;
-                      const text = e.clipboardData.getData("text/plain").trim().replace(/\s+/g, " ");
-                      const cut = text.lastIndexOf(" ");
-                      if (cut < 0) return;
-                      e.preventDefault();
-                      const el = e.currentTarget;
-                      const firstRaw =
-                        el.value.slice(0, el.selectionStart ?? el.value.length) +
-                        text.slice(0, cut) +
-                        el.value.slice(el.selectionEnd ?? el.value.length);
-                      const lastRaw = text.slice(cut + 1);
-                      const first = typeableText(firstRaw, style);
-                      const last = typeableText(lastRaw, style);
-                      const rejected = first !== firstRaw || last !== lastRaw;
-                      if (rejected) spin.current.shakeAt = performance.now();
-                      onRejected(rejected);
-                      onNameChange({ first, last });
-                      requestAnimationFrame(() => {
-                        const next = inputs.current.last;
-                        if (!next) return;
-                        next.focus();
-                        next.setSelectionRange(next.value.length, next.value.length);
-                        syncSelection(next);
-                      });
-                    }}
-                  />
-                ))}
-              </div>
+                {photoTools}
+              </PhotoToolbar>
+              <NameInputs
+                inputs={inputs}
+                name={name}
+                latestName={() => latest.current.name}
+                style={style}
+                onNameChange={onNameChange}
+                onRejected={(rejected) => {
+                  // The card shakes its head
+                  if (rejected) spin.current.shakeAt = performance.now();
+                  onRejected(rejected);
+                }}
+                onFocusChange={setFocus}
+                onSelection={syncSelection}
+                onKeyDown={onFieldKeyDown}
+              />
               <input
                 ref={fileInput}
                 type="file"

@@ -4,8 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
-  type PointerEvent,
 } from "react";
 import {
   Card,
@@ -18,9 +16,9 @@ import {
 import { CARD_SLOT, PREVIEW_CARD, lanyardDesigns, type LanyardDesign } from "@/lib/lanyard";
 import type { CardScene, CardSpec } from "./business-card-3d";
 import { BACKDROP } from "./business-card-preview";
-import { newSpin, sideAt, yawFor } from "./business-card-spin";
 import type { LanyardRig } from "./lanyard-3d";
 import { Swatches, type Swatch } from "./style-swatches";
+import { useReducedMotion, useTurnGesture, useWebgl } from "./use-card-stage";
 
 // Lanyard preview on native Fluid parts, like the business card: CardGroup /
 // Card on the brand backdrop, title and size in the header, the design swatches
@@ -49,28 +47,9 @@ const BADGE: CardSpec = {
   sameSides: true,
 };
 
+/** Max tilt up and down while dragging, radians: less than the card's, the
+ *  strap would show its edge */
 const MAX_PITCH = 0.3;
-const FLICK = 0.12;
-
-let webgl: boolean | undefined;
-const noSubscribe = () => () => {};
-function webglAvailable(): boolean {
-  if (webgl === undefined) {
-    try {
-      webgl = Boolean(document.createElement("canvas").getContext("webgl2"));
-    } catch {
-      webgl = false;
-    }
-  }
-  return webgl;
-}
-
-const REDUCED = "(prefers-reduced-motion: reduce)";
-function subscribeReduced(cb: () => void) {
-  const mq = window.matchMedia(REDUCED);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-}
 
 export function LanyardPreview({
   sizeLabel,
@@ -81,14 +60,14 @@ export function LanyardPreview({
   design: LanyardDesign;
   onDesignChange: (design: LanyardDesign) => void;
 }) {
-  const hasWebgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null);
-  const reducedMotion = useSyncExternalStore(
-    subscribeReduced,
-    () => window.matchMedia(REDUCED).matches,
-    () => false,
-  );
+  const hasWebgl = useWebgl();
+  const reducedMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
-  const spin = useRef(newSpin());
+  // Dragging turns it, as the business card
+  const { spin, handlers: turn } = useTurnGesture({
+    maxPitch: MAX_PITCH,
+    enabled: hasWebgl === true,
+  });
   const sceneEl = useRef<HTMLDivElement>(null);
   const scene = useRef<CardScene | null>(null);
   const rig = useRef<LanyardRig | null>(null);
@@ -124,7 +103,7 @@ export function LanyardPreview({
       scene.current = null;
       rig.current = null;
     };
-  }, [hasWebgl]);
+  }, [hasWebgl, spin]);
   useEffect(() => {
     designRef.current = design;
     rig.current?.setDesign(design);
@@ -132,48 +111,6 @@ export function LanyardPreview({
   useEffect(() => {
     scene.current?.setReducedMotion(reducedMotion);
   }, [reducedMotion, ready]);
-
-  // Dragging turns it, as the business card
-  const drag = useRef({ x: 0, y: 0, t: 0, velocity: 0 });
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    spin.current.dragging = true;
-    drag.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, velocity: 0 };
-  };
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const s = spin.current;
-    const rect = e.currentTarget.getBoundingClientRect();
-    s.hover =
-      e.pointerType === "mouse"
-        ? {
-            x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
-            y: ((e.clientY - rect.top) / rect.height) * 2 - 1,
-          }
-        : null;
-    if (!s.dragging) return;
-    const d = drag.current;
-    const dYaw = ((e.clientX - d.x) / rect.width) * Math.PI * 1.1;
-    s.targetYaw += dYaw;
-    if (e.pointerType === "mouse")
-      s.targetPitch = Math.max(
-        -MAX_PITCH,
-        Math.min(MAX_PITCH, s.targetPitch + ((e.clientY - d.y) / rect.width) * Math.PI),
-      );
-    d.velocity = dYaw / (Math.max(1, e.timeStamp - d.t) / 1000);
-    d.x = e.clientX;
-    d.y = e.clientY;
-    d.t = e.timeStamp;
-  };
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    const s = spin.current;
-    if (!s.dragging) return;
-    s.dragging = false;
-    // A pause before release means no flick
-    const velocity = e.timeStamp - drag.current.t > 80 ? 0 : drag.current.velocity;
-    const projected = s.targetYaw + velocity * FLICK;
-    s.targetYaw = yawFor(sideAt(projected), projected);
-    s.targetPitch = 0;
-  };
 
   return (
     <CardGroup
@@ -193,13 +130,7 @@ export function LanyardPreview({
             role="img"
             aria-label={`Lanyard, ${design} design${hasWebgl ? ". Drag to turn it." : ""}`}
             className={`relative h-[400px] touch-pan-y select-none sm:h-[500px] ${hasWebgl ? "cursor-grab active:cursor-grabbing" : ""}`}
-            onPointerDown={hasWebgl ? onPointerDown : undefined}
-            onPointerMove={hasWebgl ? onPointerMove : undefined}
-            onPointerUp={hasWebgl ? onPointerUp : undefined}
-            onPointerCancel={hasWebgl ? onPointerUp : undefined}
-            onPointerLeave={() => {
-              spin.current.hover = null;
-            }}
+            {...turn}
           >
             {hasWebgl === false && (
               <p className="absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground">

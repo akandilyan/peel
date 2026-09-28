@@ -13,6 +13,7 @@ import {
   checkName,
   defaultCrop,
   defaultBadgeStyle,
+  emptyName,
   faceCrop,
   fitField,
   photoDpi,
@@ -52,7 +53,7 @@ export interface BadgeState {
 }
 
 export const emptyBadge: BadgeState = {
-  name: { first: "", last: "" },
+  name: emptyName,
   photo: null,
   crop: { zoom: 1, x: 0.5, y: 0.5 },
   face: null,
