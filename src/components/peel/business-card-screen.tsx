@@ -7,8 +7,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardGroup,
@@ -31,6 +34,7 @@ import {
   cardStyles,
   cardFileName,
   checkCard,
+  emptyCard,
   exampleCard,
   formatEmail,
   formatLinkedin,
@@ -139,6 +143,13 @@ export function BusinessCardBody({
   const set = (key: CardField, value: string) => {
     build.reset();
     onFieldsChange({ ...fields, [key]: value });
+  };
+  // Clear all: every field, the design stays
+  const isEmpty = Object.values(fields).every((v) => !v);
+  const clearAll = () => {
+    build.reset();
+    setTouched(new Set());
+    onFieldsChange(emptyCard);
   };
 
   // Phone, email and LinkedIn are reformatted as you type. The caret keeps its
@@ -274,7 +285,20 @@ export function BusinessCardBody({
               the page background, a hairline frame), apart from the read-only
               Details. Label — field rows inside, like Details; fluid hover runs
               over the whole group (InputGroup). */}
-          <FormCard title="On the card">
+          <FormCard
+            title="On the card"
+            action={
+              <Button
+                variant="ghost"
+                size="compact"
+                leadingIcon={RotateCcw}
+                disabled={isEmpty}
+                onClick={clearAll}
+              >
+                Clear all
+              </Button>
+            }
+          >
             <InputGroup className="w-full gap-0">{rows(PRINTED_FIELDS)}</InputGroup>
           </FormCard>
           <FormCard
@@ -415,10 +439,13 @@ export function FieldRow({
 export function FormCard({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  /** A button pinned right of the title (native CardAction) */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -429,6 +456,7 @@ export function FormCard({
         <CardHeader>
           <SectionHeading>{title}</SectionHeading>
           {description && <CardDescription>{description}</CardDescription>}
+          {action && <CardAction>{action}</CardAction>}
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>

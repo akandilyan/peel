@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // MediaPipe Wasm runtime, copied from node_modules (scripts/copy-mediapipe.mjs)
+    "public/mediapipe/**",
     // Fluid Functionalism library files — installed from the registry, not edited
     // (see CLAUDE.md). The linter checks only project code.
     "src/components/ui/**",

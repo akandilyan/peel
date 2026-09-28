@@ -499,6 +499,112 @@ export function defaultCrop(photo: BadgePhoto): PhotoCrop {
   return clampCrop(photo, { zoom: 1, x: 0.5, y: 0.4 });
 }
 
+/** A face found on the photo, in photo pixels. */
+export interface PhotoFace {
+  /** Midpoint between the pupils */
+  eyes: { x: number; y: number };
+  /** Distance between the pupils */
+  eyeSpan: number;
+  /** From the eye line down to the mouth */
+  eyeToMouth: number;
+  /** The head's middle across: between the ears (the eyes shift off it when
+   *  the head turns) */
+  headX: number;
+  /** The top of the hair, from the person's silhouette; null — unknown */
+  hairTop: number | null;
+  /** The middle of the shoulders across, from the silhouette; null — unknown */
+  torsoX: number | null;
+}
+
+/** Where the head goes in the square. After ICAO 9303 portraits (chin to crown
+ *  70–80% of a 35 × 45 mm frame), smaller so the shoulders show, and measured
+ *  to the top of the hair, so the air over it is the same for any hair. */
+export const HEAD_FRAMING = {
+  /** Chin to the top of the hair, as a share of the square's side: with the
+   *  air over the hair, a quarter of the square under the chin for the neck
+   *  and shoulders */
+  head: 0.66,
+  /** Air over the hair, as a share of the side */
+  top: 0.08,
+  /** …but the eye line no farther down than this share of the side */
+  eyes: 0.43,
+  /** How far the square moves from the head toward the shoulders' middle: a
+   *  hint, so a turned body leaves less of an empty side while the face stays
+   *  about centered */
+  torsoPull: 0.15,
+  /** …but the head stays within this share of the side off the center */
+  maxShift: 0.05,
+};
+
+/** Head height (chin to crown) from the face's features, by average
+ *  proportions: ~3.6 pupil spans, ~3.3 eye-to-mouth drops. Both shrink when
+ *  the head turns or tilts, so the larger one wins. */
+export function headHeight(face: PhotoFace) {
+  return Math.max(3.6 * face.eyeSpan, 3.3 * face.eyeToMouth);
+}
+
+/** A framing that sets the head in the square as HEAD_FRAMING says. The eyes
+ *  sit at about half the head's height, so the chin is half a head below
+ *  them; the top is the hair's, or a guess of it (the crown plus a little
+ *  hair). Never zoomed in past MIN_DPI, so the auto framing never makes the
+ *  print blurry. */
+export function faceCrop(photo: BadgePhoto, face: PhotoFace): PhotoCrop {
+  const H = headHeight(face);
+  const chin = face.eyes.y + H / 2;
+  const top = face.hairTop ?? face.eyes.y - 0.58 * H;
+  const minSide = (PHOTO.sizeMm / 25.4) * MIN_DPI;
+  // The square never outgrows the photo: a tight photo keeps the head bigger
+  const side = Math.min(
+    Math.max((chin - top) / HEAD_FRAMING.head, minSide),
+    Math.min(photo.width, photo.height),
+  );
+  const zoom = Math.min(photo.width, photo.height) / side;
+  // The air over the hair, but the eye line no farther down the square than
+  // HEAD_FRAMING.eyes: in a tight photo (the square can't shrink the head to
+  // its share) the chin and neck matter more than the air, and a hat, a hijab
+  // or big hair taken for the head's top would push the face down otherwise
+  const squareTop = Math.max(
+    top - HEAD_FRAMING.top * side,
+    face.eyes.y - HEAD_FRAMING.eyes * side,
+  );
+  const limit = HEAD_FRAMING.maxShift * side;
+  const shift =
+    face.torsoX === null
+      ? 0
+      : Math.max(-limit, Math.min(limit, HEAD_FRAMING.torsoPull * (face.torsoX - face.headX)));
+  return clampCrop(photo, {
+    zoom,
+    x: (face.headX + shift) / photo.width,
+    y: (squareTop + side / 2) / photo.height,
+  });
+}
+
+/** What's off with a photo for the badge, however it's framed: the head runs
+ *  off the photo's edge (cut); the face is so small the square gets blurry
+ *  before it's big enough (small: under ~70% of its size at MIN_DPI); the
+ *  head is so big no framing leaves room under the chin (tight). */
+export type FramingIssue = "cut" | "small" | "tight";
+
+export function framingIssue(photo: BadgePhoto, face: PhotoFace): FramingIssue | null {
+  const H = headHeight(face);
+  const chin = face.eyes.y + H / 2;
+  // The skull, without the hair: a head is about 0.7 of its height wide
+  const crown = face.eyes.y - H / 2;
+  const slack = 0.08 * H;
+  if (
+    crown < -slack ||
+    chin > photo.height + slack ||
+    face.headX - 0.35 * H < -slack ||
+    face.headX + 0.35 * H > photo.width + slack
+  )
+    return "cut";
+  const top = face.hairTop ?? face.eyes.y - 0.58 * H;
+  const wanted = (chin - top) / HEAD_FRAMING.head;
+  if (wanted < 0.7 * (PHOTO.sizeMm / 25.4) * MIN_DPI) return "small";
+  if (wanted > 1.4 * Math.min(photo.width, photo.height)) return "tight";
+  return null;
+}
+
 /** The part of the photo in the square, in photo pixels. */
 export function cropRect(photo: BadgePhoto, crop: PhotoCrop) {
   const { hx, hy, side } = halfView(photo, crop.zoom);

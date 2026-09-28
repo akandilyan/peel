@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TabsSubtle, TabsSubtleItem } from "@/components/ui/tabs-subtle";
+import { Elevated } from "@/lib/elevated";
 import {
   BADGE,
   MAX_ZOOM,
@@ -147,6 +148,7 @@ export function IdBadgePreview({
   onCropChange,
   onFile,
   onRejected,
+  photoTools,
   footerEnd,
 }: {
   label: string;
@@ -163,7 +165,10 @@ export function IdBadgePreview({
   onFile: (file: File) => void;
   /** Typed characters the badge can't print were dropped (or not) */
   onRejected: (rejected: boolean) => void;
-  /** Photo buttons, right of the zoom slider */
+  /** Photo buttons (auto frame, replace, remove), right of the zoom slider in
+   *  the framing toolbar */
+  photoTools?: ReactNode;
+  /** Right of the version tabs: Clear all */
   footerEnd?: ReactNode;
 }) {
   const hasWebgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null);
@@ -187,6 +192,32 @@ export function IdBadgePreview({
   const [caretOn, setCaretOn] = useState(true);
   const [dropTarget, setDropTarget] = useState(false);
   const [framing, setFraming] = useState(false);
+  // The pointer is over the empty photo square: its add-photo button eases up
+  // (addHover 0…1, drawn in the texture) and back down when it leaves
+  const [overAdd, setOverAdd] = useState(false);
+  const [addHover, setAddHover] = useState(0);
+  const addHoverNow = useRef(0);
+  useEffect(() => {
+    // A dragged file over the card lifts it too
+    const target = (overAdd || dropTarget) && !photo ? 1 : 0;
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = now - last;
+      last = now;
+      const from = addHoverNow.current;
+      // ~150 ms each way; reduced motion jumps
+      const next = reducedMotion
+        ? target
+        : from + Math.sign(target - from) * Math.min(Math.abs(target - from), dt / 150);
+      addHoverNow.current = next;
+      // Ease-out on the way up, ease-in on the way down
+      setAddHover(target ? 1 - (1 - next) ** 2 : next ** 2);
+      if (next !== target) raf = requestAnimationFrame(step);
+    };
+    if (addHoverNow.current !== target) raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [overAdd, dropTarget, photo, reducedMotion]);
   // A new photo starts framing at once: it usually needs moving and zooming
   const [framedUrl, setFramedUrl] = useState(photo?.url);
   if (photo?.url !== framedUrl) {
@@ -295,6 +326,7 @@ export function IdBadgePreview({
         : null,
     dropTarget,
     framing: framing && Boolean(photo),
+    addHover,
   };
   // ─── Picking ───────────────────────────────────────────────────────────────
 
@@ -522,6 +554,7 @@ export function IdBadgePreview({
     if (g.mode) return;
     // Hover: the cursor tells what a click will do; a drag always turns
     const zone = zoneOf(pick(e.clientX, e.clientY), style);
+    setOverAdd(zone === "photo" && !photo);
     setCursor(
       zone === "name"
         ? "text"
@@ -665,6 +698,7 @@ export function IdBadgePreview({
               onClick={onClick}
               onPointerLeave={() => {
                 spin.current.hover = null;
+                setOverAdd(false);
               }}
               onKeyDown={onStageKeyDown}
               onDragOver={(e) => {
@@ -694,10 +728,40 @@ export function IdBadgePreview({
                 ref={sceneEl}
                 className={`absolute inset-0 transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"}`}
               />
+              {/* CUSTOM: the framing toolbar floats over the stage's bottom
+                  while the photo is framed — native Slider and Buttons on an
+                  Elevated surface, as a dropdown's. Its pointer and key events
+                  stay in it: the stage would turn the card or move the photo. */}
               {framing && photo && (
-                <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[12px] text-muted-foreground">
-                  Drag to move the photo · Esc or click outside when done
-                </p>
+                <div className="absolute inset-x-3 bottom-3 flex justify-center">
+                  <Elevated
+                    offset={2}
+                    shadowLevel={3}
+                    className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl p-1"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerMove={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {/* Scrubber: pips at 5% steps would be 61 dots */}
+                    <div className="w-[150px]">
+                      <Slider
+                        variant="scrubber"
+                        label="Zoom"
+                        value={crop.zoom}
+                        min={1}
+                        max={MAX_ZOOM}
+                        step={0.05}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                        onChange={(v) =>
+                          onCropChange(clampCrop(photo, { ...crop, zoom: v as number }))
+                        }
+                      />
+                    </div>
+                    {photoTools}
+                  </Elevated>
+                </div>
               )}
               {/* The name inputs: invisible, over the name block so the page
                   doesn't jump when a phone keyboard opens; 16 px keeps iOS from
@@ -766,34 +830,13 @@ export function IdBadgePreview({
               />
             </div>
           </CardContent>
-          {/* The versions in the middle; with a photo, the zoom slider left of
-              them and the photo buttons right (no photo yet — the empty square
-              on the card takes a click or a dropped file). On a phone the tabs
-              take their own row on top. */}
+          {/* The versions in the middle, Clear all right. The photo's zoom
+              and buttons are in the framing toolbar on the stage: a click on
+              the photo or a new photo shows it (no photo yet — the empty
+              square on the card takes a click or a dropped file). On a phone
+              the tabs take their own row on top. */}
           <CardFooter className="grid grid-cols-2 items-center gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-x-6">
-            <div className="min-w-0 justify-self-stretch">
-              {/* Scrubber: pips at 5% steps would be 61 dots. Zooming starts
-                  framing, so the next drag on the photo moves it. Narrower than
-                  its column so it keeps clear of the tabs. */}
-              {photo && (
-                <div className="max-w-[160px]">
-                  <Slider
-                    variant="scrubber"
-                    label="Zoom"
-                    value={crop.zoom}
-                    min={1}
-                    max={MAX_ZOOM}
-                    step={0.05}
-                    formatValue={(v) => `${Math.round(v * 100)}%`}
-                    onChange={(v) => {
-                      setFraming(true);
-                      onCropChange(clampCrop(photo, { ...crop, zoom: v as number }));
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="order-first col-span-2 justify-self-center sm:order-none sm:col-span-1">
+            <div className="order-first col-span-2 justify-self-center sm:order-none sm:col-span-1 sm:col-start-2">
               <TabsSubtle
                 selectedIndex={STYLES.indexOf(style)}
                 onSelect={(i) => onStyleChange(STYLES[i])}
@@ -803,9 +846,7 @@ export function IdBadgePreview({
                 ))}
               </TabsSubtle>
             </div>
-            <div className="flex items-center gap-1 justify-self-end">
-              {photo && footerEnd}
-            </div>
+            <div className="col-start-2 justify-self-end sm:col-start-3">{footerEnd}</div>
           </CardFooter>
         </Card>
       </CardGroup>

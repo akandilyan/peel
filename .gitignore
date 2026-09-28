@@ -46,3 +46,9 @@ next-env.d.ts
 # Local instructions for Claude Code — not published
 /CLAUDE.md
 /AGENTS.md
+
+# MediaPipe Wasm runtime, copied from node_modules (scripts/copy-mediapipe.mjs)
+/public/mediapipe/wasm/
+
+# Test portraits for /dev/portraits, downloaded by scripts/fetch-portraits.mjs
+/public/dev-portraits/

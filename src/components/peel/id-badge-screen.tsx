@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { RefreshCw, RotateCcw, ScanFace, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useTypeScale } from "@/lib/size-context";
@@ -14,6 +14,7 @@ import {
   checkName,
   defaultCrop,
   defaultBadgeStyle,
+  faceCrop,
   fitField,
   photoDpi,
   photoRect,
@@ -21,8 +22,10 @@ import {
   type BadgePhoto,
   type BadgeStyle,
   type PhotoCrop,
+  type PhotoFace,
 } from "@/lib/id-badge";
 import { exportIdBadge } from "@/lib/id-badge-pdf";
+import { detectFace } from "@/lib/face-detect";
 import { formatSize } from "@/lib/units";
 import { DetailsTable, SizeValue } from "./decal-details";
 import { DownloadIsland } from "./download-island";
@@ -33,7 +36,8 @@ import { useUnits } from "./units-menu";
 
 // ID badge builder: everything is edited right on the 3D card — pick the
 // version (Avride, HireArt, Visitor) in the tabs under it, type the name on it,
-// drop and frame the photo (zoom and photo buttons under it); the Download
+// drop and frame the photo (zoom and photo buttons in the toolbar over the
+// stage while framing); Clear all under it, right of the tabs; the Download
 // panel holds just the file. The visitor badge has no photo: one added for
 // another version stays for when you switch back. The
 // photo is an object URL: it stays in this browser, nothing is uploaded.
@@ -43,6 +47,8 @@ export interface BadgeState {
   name: BadgeName;
   photo: BadgePhoto | null;
   crop: PhotoCrop;
+  /** The face found on the photo, for Auto frame; null while looking or none */
+  face: PhotoFace | null;
   style: BadgeStyle;
 }
 
@@ -50,6 +56,7 @@ export const emptyBadge: BadgeState = {
   name: { first: "", last: "" },
   photo: null,
   crop: { zoom: 1, x: 0.5, y: 0.5 },
+  face: null,
   style: defaultBadgeStyle,
 };
 
@@ -92,25 +99,47 @@ export function IdBadgeBody({
   // The photo on this version: none on the visitor badge
   const photo = needsPhoto ? badge.photo : null;
 
+  // The badge as of the last render: face detection finishes after it
+  const latest = useRef(badge);
+  useEffect(() => {
+    latest.current = badge;
+  });
+
   const update = (next: Partial<BadgeState>) => {
     build.reset();
-    onBadgeChange({ ...badge, ...next });
+    onBadgeChange({ ...latest.current, ...next });
   };
 
   const onFile = async (file: File) => {
     setPhotoError(null);
+    let next: BadgePhoto;
     try {
-      const next = await loadPhoto(file);
-      if (badge.photo) URL.revokeObjectURL(badge.photo.url);
-      update({ photo: next, crop: defaultCrop(next) });
+      next = await loadPhoto(file);
     } catch {
       // HEIC opens only in Safari, RAW and PDF nowhere
       setPhotoError("Couldn't open this file. Use a JPEG or PNG photo.");
+      return;
     }
+    if (latest.current.photo) URL.revokeObjectURL(latest.current.photo.url);
+    const initial = defaultCrop(next);
+    update({ photo: next, crop: initial, face: null });
+    // Then frame the face, unless the photo was framed or replaced meanwhile
+    const face = await detectFace(next.url).catch(() => null);
+    const now = latest.current;
+    if (!face || now.photo !== next) return;
+    update(now.crop === initial ? { face, crop: faceCrop(next, face) } : { face });
   };
   const removePhoto = () => {
     if (photo) URL.revokeObjectURL(photo.url);
-    update({ photo: null, crop: emptyBadge.crop });
+    update({ photo: null, crop: emptyBadge.crop, face: null });
+  };
+  // Clear all: the name and the photo, the version stays
+  const clearAll = () => {
+    if (badge.photo) URL.revokeObjectURL(badge.photo.url);
+    setNameFull(false);
+    setNameRejected(false);
+    setPhotoError(null);
+    update({ ...emptyBadge, style });
   };
   const pickFile = () => {
     const input = document.createElement("input");
@@ -125,6 +154,12 @@ export function IdBadgeBody({
 
   const isExample = !name.first.trim() && !name.last.trim();
   const dpi = photo ? photoDpi(photo, crop) : 0;
+  const autoCrop = photo && badge.face ? faceCrop(photo, badge.face) : null;
+  const isAutoFramed =
+    autoCrop !== null &&
+    Math.abs(autoCrop.zoom - crop.zoom) < 1e-3 &&
+    Math.abs(autoCrop.x - crop.x) < 1e-4 &&
+    Math.abs(autoCrop.y - crop.y) < 1e-4;
   const fileName = badgeFileName(decal.id, style, name);
 
   const caption = (text: string, tone = "text-muted-foreground") => (
@@ -158,24 +193,42 @@ export function IdBadgeBody({
             onCropChange={(c) => update({ crop: c })}
             onFile={(f) => void onFile(f)}
             onRejected={setNameRejected}
-            footerEnd={
-              photo ? (
-                <>
-                  <Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={pickFile}>
-                    Replace
+            photoTools={
+              <>
+                <Button
+                  variant="ghost"
+                  size="compact"
+                  leadingIcon={ScanFace}
+                  disabled={!autoCrop || isAutoFramed}
+                  onClick={() => autoCrop && update({ crop: autoCrop })}
+                >
+                  Auto frame
+                </Button>
+                <Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={pickFile}>
+                  Replace
+                </Button>
+                <Tooltip content="Remove photo" side="top">
+                  <Button
+                    variant="ghost"
+                    size="icon-compact"
+                    aria-label="Remove photo"
+                    onClick={removePhoto}
+                  >
+                    <Trash2 />
                   </Button>
-                  <Tooltip content="Remove photo" side="top">
-                    <Button
-                      variant="ghost"
-                      size="icon-compact"
-                      aria-label="Remove photo"
-                      onClick={removePhoto}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </Tooltip>
-                </>
-              ) : null
+                </Tooltip>
+              </>
+            }
+            footerEnd={
+              <Button
+                variant="ghost"
+                size="compact"
+                leadingIcon={RotateCcw}
+                disabled={isExample && !badge.photo}
+                onClick={clearAll}
+              >
+                Clear all
+              </Button>
             }
           />
           {Object.values(errors).map((e) => (

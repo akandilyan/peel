@@ -30,6 +30,9 @@ export interface BadgeDrawing {
   dropTarget: boolean;
   /** The photo is being framed: outlined */
   framing?: boolean;
+  /** The add-photo button under the pointer, 0…1 as it eases in: it grows
+   *  and darkens */
+  addHover?: number;
 }
 
 /** Brand violet at low strength: the selection and the drop target. */
@@ -121,7 +124,7 @@ function drawPhoto(ctx: CanvasRenderingContext2D, d: BadgeDrawing, rect: PhotoRe
       ctx.fillStyle = "#f4f4f5";
       ctx.fillRect(x, y, sizeMm, sizeMm);
     }
-    drawAddPhoto(ctx, rect);
+    drawAddPhoto(ctx, rect, d.addHover ?? 0);
   }
   if (d.dropTarget) {
     ctx.fillStyle = HIGHLIGHT;
@@ -136,13 +139,14 @@ function drawPhoto(ctx: CanvasRenderingContext2D, d: BadgeDrawing, rect: PhotoRe
 
 /** A round dark button with a white upload arrow in the middle of the photo
  *  square: add a photo here. */
-function drawAddPhoto(ctx: CanvasRenderingContext2D, rect: PhotoRect) {
+function drawAddPhoto(ctx: CanvasRenderingContext2D, rect: PhotoRect, hover: number) {
   const cx = rect.x + rect.sizeMm / 2;
   const cy = rect.y + rect.sizeMm / 2;
-  const r = 4.2;
-  const icon = 4;
+  const grow = 1 + 0.12 * hover;
+  const r = 4.2 * grow;
+  const icon = 4 * grow;
   ctx.save();
-  ctx.fillStyle = "rgba(23, 23, 23, 0.55)";
+  ctx.fillStyle = `rgba(23, 23, 23, ${0.55 + 0.2 * hover})`;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();

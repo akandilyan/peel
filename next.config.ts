@@ -8,6 +8,12 @@ const basePath = process.env.PAGES_BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
   output: "export",
+  // Dev-only pages (*.dev.tsx, e.g. /dev/portraits) exist under next dev only:
+  // the static build doesn't see them
+  pageExtensions:
+    process.env.NODE_ENV === "development"
+      ? ["dev.tsx", "tsx", "ts", "jsx", "js"]
+      : ["tsx", "ts", "jsx", "js"],
   // Pages as folders with index.html: the URL /peel/car-side-logo/ resolves
   // unambiguously on GitHub Pages (Next.js service folders sit alongside)
   trailingSlash: true,
