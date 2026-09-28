@@ -19,7 +19,8 @@ export const changelog: Release[] = [
     date: "2026-09-28",
     changes: [
       "ID badge: a new photo frames itself on your face — sized and centered on the head, with room over the hair; Auto frame brings it back after you move it.",
-      "ID badge: zoom, Auto frame, Replace and Remove sit on the card while you frame the photo.",
+      "ID badge: zoom, Auto, Replace and Remove sit on the card while you frame the photo.",
+      "ID badge: paste a full name into the first name and it splits into first and last name.",
       "Clear all on the ID badge and the business card empties every field at once.",
     ],
     decals: ["team-id-badge", "team-business-card"],

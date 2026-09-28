@@ -20,7 +20,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TabsSubtle, TabsSubtleItem } from "@/components/ui/tabs-subtle";
+import { AnimatePresence, motion } from "framer-motion";
 import { Elevated } from "@/lib/elevated";
+import { spring } from "@/lib/springs";
 import {
   BADGE,
   MAX_ZOOM,
@@ -49,14 +51,45 @@ import type { CardPoint, CardScene, CardSpec } from "./business-card-3d";
 import { BACKDROP } from "./business-card-preview";
 import { newSpin, sideAt, yawFor } from "./business-card-spin";
 
+/** The framing toolbar's surface, animated in and out */
+const MotionElevated = motion.create(Elevated);
+
+/** 0…1 easing toward on (1) or off (0) in about ms each way: ease-out on the
+ *  way up, ease-in on the way down; a jump with reduced motion. For states
+ *  drawn in the card texture, where CSS transitions don't reach. */
+function useEase(on: boolean, ms: number, reduced: boolean) {
+  const [value, setValue] = useState(on ? 1 : 0);
+  const now = useRef(on ? 1 : 0);
+  useEffect(() => {
+    const target = on ? 1 : 0;
+    let raf = 0;
+    let last = performance.now();
+    const step = (t: number) => {
+      const dt = t - last;
+      last = t;
+      const from = now.current;
+      const next = reduced
+        ? target
+        : from + Math.sign(target - from) * Math.min(Math.abs(target - from), dt / ms);
+      now.current = next;
+      setValue(target ? 1 - (1 - next) ** 2 : next ** 2);
+      if (next !== target) raf = requestAnimationFrame(step);
+    };
+    if (now.current !== target) raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [on, ms, reduced]);
+  return value;
+}
+
 // ID badge preview, the business card's 3D card on native Fluid parts (CardGroup /
 // Card on the brand backdrop, title and size in the header, controls in the
 // footer: the template versions as TabsSubtle in the middle, as the business
-// card's Front / Back, the zoom slider left of them and the photo buttons right).
+// card's Front / Back, Clear all right; the photo's zoom and buttons in a
+// toolbar over the stage while it's framed).
 // CUSTOM: the badge is edited right on the card, by zones found with a
 // raycast, so it works at any angle:
 // - a drag anywhere turns the card;
-// - the photo: a click, zooming (pinch — ctrl + wheel — or the footer slider) or
+// - the photo: a click, zooming (pinch — ctrl + wheel) or
 //   a new photo starts framing: a drag moves the photo until a click off it or
 //   Esc; empty — click to pick a file; a file dropped on the stage replaces it;
 // - the name: click and type — the input is hidden, the caret and selection are
@@ -192,32 +225,12 @@ export function IdBadgePreview({
   const [caretOn, setCaretOn] = useState(true);
   const [dropTarget, setDropTarget] = useState(false);
   const [framing, setFraming] = useState(false);
-  // The pointer is over the empty photo square: its add-photo button eases up
-  // (addHover 0…1, drawn in the texture) and back down when it leaves
+  // The pointer is over the empty photo square (or a file dragged over the
+  // card): its add-photo button eases up, drawn in the texture
   const [overAdd, setOverAdd] = useState(false);
-  const [addHover, setAddHover] = useState(0);
-  const addHoverNow = useRef(0);
-  useEffect(() => {
-    // A dragged file over the card lifts it too
-    const target = (overAdd || dropTarget) && !photo ? 1 : 0;
-    let raf = 0;
-    let last = performance.now();
-    const step = (now: number) => {
-      const dt = now - last;
-      last = now;
-      const from = addHoverNow.current;
-      // ~150 ms each way; reduced motion jumps
-      const next = reducedMotion
-        ? target
-        : from + Math.sign(target - from) * Math.min(Math.abs(target - from), dt / 150);
-      addHoverNow.current = next;
-      // Ease-out on the way up, ease-in on the way down
-      setAddHover(target ? 1 - (1 - next) ** 2 : next ** 2);
-      if (next !== target) raf = requestAnimationFrame(step);
-    };
-    if (addHoverNow.current !== target) raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [overAdd, dropTarget, photo, reducedMotion]);
+  const addHover = useEase((overAdd || dropTarget) && !photo, 150, reducedMotion);
+  // The selected photo shows the rest of itself over the card, easing in
+  const selected = useEase(framing && Boolean(photo), 100, reducedMotion);
   // A new photo starts framing at once: it usually needs moving and zooming
   const [framedUrl, setFramedUrl] = useState(photo?.url);
   if (photo?.url !== framedUrl) {
@@ -325,7 +338,7 @@ export function IdBadgePreview({
           }
         : null,
     dropTarget,
-    framing: framing && Boolean(photo),
+    selected,
     addHover,
   };
   // ─── Picking ───────────────────────────────────────────────────────────────
@@ -447,7 +460,7 @@ export function IdBadgePreview({
   // ─── Pointer ───────────────────────────────────────────────────────────────
 
   // Framing: a click on the photo, zooming it or a new photo starts it — the
-  // photo gets an outline and a drag moves the photo instead of turning the
+  // photo gets a violet line around it and a drag moves it instead of turning the
   // card. A click off the photo, Esc or a click outside the preview ends it.
   const startFraming = () => setFraming(true);
   const stopFraming = () => setFraming(false);
@@ -730,39 +743,57 @@ export function IdBadgePreview({
               />
               {/* CUSTOM: the framing toolbar floats over the stage's bottom
                   while the photo is framed — native Slider and Buttons on an
-                  Elevated surface, as a dropdown's. Its pointer and key events
-                  stay in it: the stage would turn the card or move the photo. */}
-              {framing && photo && (
-                <div className="absolute inset-x-3 bottom-3 flex justify-center">
-                  <Elevated
-                    offset={2}
-                    shadowLevel={3}
-                    className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl p-1"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onPointerMove={(e) => e.stopPropagation()}
-                    onPointerUp={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    {/* Scrubber: pips at 5% steps would be 61 dots */}
-                    <div className="w-[150px]">
-                      <Slider
-                        variant="scrubber"
-                        label="Zoom"
-                        value={crop.zoom}
-                        min={1}
-                        max={MAX_ZOOM}
-                        step={0.05}
-                        formatValue={(v) => `${Math.round(v * 100)}%`}
-                        onChange={(v) =>
-                          onCropChange(clampCrop(photo, { ...crop, zoom: v as number }))
-                        }
-                      />
-                    </div>
-                    {photoTools}
-                  </Elevated>
-                </div>
-              )}
+                  Elevated surface, as a dropdown's, made see-through (its own
+                  surface color at 50%, important over Elevated's opaque one)
+                  over a blur of the card and the backdrop; instead of the
+                  surface's ring and shadow, a hairline of the text color at
+                  12%, dark on the light theme and light on the dark one. It rises in and fades up, and out
+                  the same way, shorter; the opacity is on the blurred surface
+                  itself — on a parent it would switch the backdrop blur off
+                  until the fade ends. Its pointer and key events stay in it:
+                  the stage would turn the card or move the photo. */}
+              <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-center">
+                <AnimatePresence>
+                  {framing && photo && (
+                    <MotionElevated
+                      key="tools"
+                      initial={{ opacity: 0, y: reducedMotion ? 0 : 6, scale: reducedMotion ? 1 : 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1, transition: spring.moderate }}
+                      exit={{
+                        opacity: 0,
+                        y: reducedMotion ? 0 : 4,
+                        scale: reducedMotion ? 1 : 0.99,
+                        transition: { duration: spring.moderate.exit.duration },
+                      }}
+                      offset={2}
+                      shadowLevel={3}
+                      className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl border border-foreground/12 bg-surface-3/50! p-1 shadow-none! backdrop-blur-xl backdrop-saturate-150"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerMove={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      {/* Scrubber: pips at 5% steps would be 61 dots */}
+                      <div className="w-[130px]">
+                        <Slider
+                          variant="scrubber"
+                          label="Zoom"
+                          value={crop.zoom}
+                          min={1}
+                          max={MAX_ZOOM}
+                          step={0.05}
+                          formatValue={(v) => `${Math.round(v * 100)}%`}
+                          onChange={(v) =>
+                            onCropChange(clampCrop(photo, { ...crop, zoom: v as number }))
+                          }
+                        />
+                      </div>
+                      {photoTools}
+                    </MotionElevated>
+                  )}
+                </AnimatePresence>
+              </div>
               {/* The name inputs: invisible, over the name block so the page
                   doesn't jump when a phone keyboard opens; 16 px keeps iOS from
                   zooming in */}
@@ -814,6 +845,36 @@ export function IdBadgePreview({
                       setFocus(null);
                     }}
                     onKeyDown={(e) => onFieldKeyDown(f.key, e)}
+                    onPaste={(e) => {
+                      // A full name pasted into the first name splits: the
+                      // last word is the last name, the rest the first name;
+                      // the focus goes on to the last name. One word pastes
+                      // as usual.
+                      if (f.key !== "first") return;
+                      const text = e.clipboardData.getData("text/plain").trim().replace(/\s+/g, " ");
+                      const cut = text.lastIndexOf(" ");
+                      if (cut < 0) return;
+                      e.preventDefault();
+                      const el = e.currentTarget;
+                      const firstRaw =
+                        el.value.slice(0, el.selectionStart ?? el.value.length) +
+                        text.slice(0, cut) +
+                        el.value.slice(el.selectionEnd ?? el.value.length);
+                      const lastRaw = text.slice(cut + 1);
+                      const first = typeableText(firstRaw, style);
+                      const last = typeableText(lastRaw, style);
+                      const rejected = first !== firstRaw || last !== lastRaw;
+                      if (rejected) spin.current.shakeAt = performance.now();
+                      onRejected(rejected);
+                      onNameChange({ first, last });
+                      requestAnimationFrame(() => {
+                        const next = inputs.current.last;
+                        if (!next) return;
+                        next.focus();
+                        next.setSelectionRange(next.value.length, next.value.length);
+                        syncSelection(next);
+                      });
+                    }}
                   />
                 ))}
               </div>

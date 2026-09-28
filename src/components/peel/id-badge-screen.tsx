@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, RotateCcw, ScanFace, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { useTypeScale } from "@/lib/size-context";
 import type { Decal } from "@/data/decals";
 import {
@@ -107,7 +106,10 @@ export function IdBadgeBody({
 
   const update = (next: Partial<BadgeState>) => {
     build.reset();
-    onBadgeChange({ ...latest.current, ...next });
+    // Ahead of the render: two updates in a row (a photo, then its face)
+    // build on each other
+    latest.current = { ...latest.current, ...next };
+    onBadgeChange(latest.current);
   };
 
   const onFile = async (file: File) => {
@@ -182,11 +184,18 @@ export function IdBadgeBody({
             onStyleChange={(st) => update({ style: st })}
             name={name}
             onNameChange={(n) => {
-              // One field changes at a time: fit the one that did
-              const field = n.first !== name.first ? "first" : "last";
-              const fitted = fitField(name, field, n[field], style);
-              setNameFull(fitted !== n[field]);
-              update({ name: { ...n, [field]: fitted } });
+              // Fit the fields that changed, one after the other: typing
+              // changes one, a pasted full name both
+              let fitted = name;
+              let cut = false;
+              for (const field of ["first", "last"] as const) {
+                if (n[field] === name[field]) continue;
+                const value = fitField(fitted, field, n[field], style);
+                cut ||= value !== n[field];
+                fitted = { ...fitted, [field]: value };
+              }
+              setNameFull(cut);
+              update({ name: fitted });
             }}
             photo={photo}
             crop={crop}
@@ -194,29 +203,28 @@ export function IdBadgeBody({
             onFile={(f) => void onFile(f)}
             onRejected={setNameRejected}
             photoTools={
+              // Ghost buttons, each with a short label to keep the toolbar
+              // narrow; Auto frame is off once the framing is the auto one, and
+              // not there with no face found to frame on.
               <>
-                <Button
-                  variant="ghost"
-                  size="compact"
-                  leadingIcon={ScanFace}
-                  disabled={!autoCrop || isAutoFramed}
-                  onClick={() => autoCrop && update({ crop: autoCrop })}
-                >
-                  Auto frame
-                </Button>
+                {autoCrop && (
+                  <Button
+                    variant="ghost"
+                    size="compact"
+                    leadingIcon={ScanFace}
+                    aria-label="Auto frame"
+                    disabled={isAutoFramed}
+                    onClick={() => update({ crop: autoCrop })}
+                  >
+                    Auto
+                  </Button>
+                )}
                 <Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={pickFile}>
                   Replace
                 </Button>
-                <Tooltip content="Remove photo" side="top">
-                  <Button
-                    variant="ghost"
-                    size="icon-compact"
-                    aria-label="Remove photo"
-                    onClick={removePhoto}
-                  >
-                    <Trash2 />
-                  </Button>
-                </Tooltip>
+                <Button variant="ghost" size="compact" leadingIcon={Trash2} onClick={removePhoto}>
+                  Remove
+                </Button>
               </>
             }
             footerEnd={

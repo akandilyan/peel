@@ -28,8 +28,8 @@ export interface BadgeDrawing {
   caret: { line: number; start: number; end: number; visible: boolean } | null;
   /** A file is dragged over the card */
   dropTarget: boolean;
-  /** The photo is being framed: outlined */
-  framing?: boolean;
+  /** The photo is selected (framed), 0…1 as it eases in: a ring around it */
+  selected?: number;
   /** The add-photo button under the pointer, 0…1 as it eases in: it grows
    *  and darkens */
   addHover?: number;
@@ -38,6 +38,9 @@ export interface BadgeDrawing {
 /** Brand violet at low strength: the selection and the drop target. */
 const HIGHLIGHT = "rgba(109, 82, 255, 0.22)";
 const HINT = "#a3a3a3";
+/** Brand violet, stronger than the logo's lavender: the caret and the selected
+ *  photo's ring */
+const ACCENT = "#6d52ff";
 
 const paths = new Map<string, Path2D>();
 const path = (d: string) => {
@@ -103,9 +106,11 @@ export function drawBadge(ctx: CanvasRenderingContext2D, d: BadgeDrawing) {
     // A placeholder keeps the caret at its start
     const at = caretLine.stops[caretLine.hint ? 0 : c.start] ?? caretLine.stops[0];
     const h = caretLine.bottom - caretLine.top;
-    ctx.fillStyle = "#6d52ff";
+    ctx.fillStyle = ACCENT;
     ctx.fillRect(at - 0.12, caretLine.top + h * 0.12, 0.24, h * 0.76);
   }
+
+  if (rect) drawSelected(ctx, d, rect);
 }
 
 /** The photo, or until one is added the example with the upload button. */
@@ -130,11 +135,23 @@ function drawPhoto(ctx: CanvasRenderingContext2D, d: BadgeDrawing, rect: PhotoRe
     ctx.fillStyle = HIGHLIGHT;
     ctx.fillRect(x, y, sizeMm, sizeMm);
   }
-  if (d.framing) {
-    ctx.strokeStyle = LOGO_COLOR;
-    ctx.lineWidth = 0.4;
-    ctx.strokeRect(x - 0.2, y - 0.2, sizeMm + 0.4, sizeMm + 0.4);
-  }
+
+}
+
+/** The selected photo: a violet line set off from it by a gap, fading in
+ *  with the selection. */
+function drawSelected(ctx: CanvasRenderingContext2D, d: BadgeDrawing, rect: PhotoRect) {
+  const amount = d.selected ?? 0;
+  if (!d.photo || amount <= 0) return;
+  const gap = 0.35;
+  const width = 0.45;
+  const off = gap + width / 2;
+  ctx.save();
+  ctx.globalAlpha = amount;
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = width;
+  ctx.strokeRect(rect.x - off, rect.y - off, rect.sizeMm + off * 2, rect.sizeMm + off * 2);
+  ctx.restore();
 }
 
 /** A round dark button with a white upload arrow in the middle of the photo
