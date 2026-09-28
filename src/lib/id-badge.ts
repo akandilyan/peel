@@ -165,10 +165,10 @@ export function photoRect(style: BadgeStyle): PhotoRect | null {
   return top === null ? null : { x: PHOTO.x, y: mm(top), sizeMm: PHOTO.sizeMm };
 }
 
-/** The Badgy100 prints at 260 × 300 dpi: less and the photo gets soft. Below
- *  MIN_DPI it's visibly blurry. */
+/** The Badgy100 prints at 260 × 300 dpi: below the lower of the two
+ *  (MIN_DPI) the photo has less detail than the printer can put down. */
 export const PRINT_DPI = 300;
-export const MIN_DPI = 200;
+export const MIN_DPI = 260;
 /** The photo goes into the PDF at up to twice the printer's resolution. */
 const MAX_EXPORT_DPI = 2 * PRINT_DPI;
 

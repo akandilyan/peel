@@ -9,7 +9,6 @@ import type { Decal } from "@/data/decals";
 import {
   BADGE,
   MIN_DPI,
-  PRINT_DPI,
   badgeFileName,
   badgeStyles,
   checkName,
@@ -189,7 +188,7 @@ export function IdBadgeBody({
           {photo &&
             dpi < MIN_DPI &&
             caption(
-              `The photo is small for print: ${Math.round(dpi)} dpi at this zoom, the printer needs ${PRINT_DPI}. Zoom out or use a larger photo.`,
+              `The photo is small for print: ${Math.round(dpi)} dpi at this zoom, the printer needs ${MIN_DPI}. Zoom out or use a larger photo.`,
               "text-destructive",
             )}
         </div>
