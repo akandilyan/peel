@@ -15,6 +15,15 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.6.1",
+    date: "2026-09-28",
+    changes: [
+      "Logos and the Unlock notice are cut along the letters instead of a rectangle: only the artwork goes on the car, applied with transfer tape. Decals on a white card keep their card outline.",
+      "Previews of these decals are drawn from the print file, so the cut line sits exactly on the artwork.",
+    ],
+    decals: ["car-uber-unlock-notice", "car-uber-side-logo", "car-side-logo", "car-trunk-logo", "car-sensor-box-logo", "robot-side-logo", "robot-top-logo"],
+  },
+  {
     version: "0.6.0",
     date: "2026-09-28",
     changes: [

@@ -14,16 +14,23 @@
 //   BleedBox = MediaBox = page. All sizes are whole mm.
 // - print & cut with a ready contour: sheet = artwork rounded up to whole
 //   mm, + MARGIN, artwork centered.
+// - print & cut along the outline (weeded, applied with transfer tape): the cut
+//   line follows the artwork's fill outlines exactly, the artwork is untouched (no
+//   ink spread: shops that trace the artwork themselves would cut a fatter logo,
+//   and their RIP adds its own registration allowance). Sheet = artwork rounded up
+//   to whole mm + MARGIN, TrimBox = the rounded artwork box.
 // - prepress (prepress.mts): brand CMYK -> Pantone spot colors, black
 //   at most 280%, live text to outlines, CutContour cut lines 0.25 pt with overprint;
 // - OutputIntent Coated FOGRA39 (profile from Adobe if installed, otherwise a reference).
 // Other files are left untouched.
 
+import { execFileSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream, PDFRef, PDFString, type PDFObject, type PDFPage } from "pdf-lib";
 import { inflateSync } from "zlib";
 import { prepressPage, stripPrivateData, type PrepressOptions } from "./prepress.mjs";
+import { pageToSvg } from "./pdf-svg.mjs";
 import { allDecals } from "../src/data/decals";
 
 const PT = 72 / 25.4;
@@ -60,6 +67,9 @@ type Job = {
   card?: boolean;
   keep?: boolean;
   cutFill?: string;
+  // outline — print & cut along the artwork outline (see the rules above);
+  // artwork bounds come from the fills, not ArtBox
+  outline?: boolean;
   // single — the original has identical pages (left and right side): keep
   // one, the required count is assembled on download (src/lib/export-static.ts)
   single?: boolean;
@@ -169,25 +179,23 @@ function addOutputIntent(doc: PDFDocument) {
 // id — decal name (as in src/data/decals.ts): originals {id}.pdf and {id}.svg
 // in the dir from the argument, output — source/{id}.pdf and preview/{id}.svg.
 const jobs: Job[] = [
-  { id: "car-side-logo", addCut: true, single: true },
-  { id: "car-trunk-logo", addCut: true },
-  { id: "car-sensor-box-logo", addCut: true },
-  {
-    id: "car-uber-unlock-notice",
-    addCut: true,
-    single: true,
-    // Visible letters (measured on the SVG) — for centering: the original's ArtBox is
-    // the live text frame. Text is converted to outlines (prepress).
-    ink: { x: 10.48, top: 8.88, w: 237.71, h: 23.0 },
-    prepress: { outlineText: true },
-  },
+  // Avride logos: printed, cut along the letters, weeded, applied with transfer
+  // tape — only the logo goes on the car
+  { id: "car-side-logo", addCut: false, outline: true, single: true },
+  { id: "car-trunk-logo", addCut: false, outline: true },
+  { id: "car-sensor-box-logo", addCut: false, outline: true },
+  // Text is converted to outlines (prepress); the outline cut takes the bounds
+  // from the letters, not the original's live text frame (ArtBox)
+  { id: "car-uber-unlock-notice", addCut: false, outline: true, single: true, prepress: { outlineText: true } },
   { id: "car-uber-back-seat-notice", addCut: false },
-  { id: "robot-side-logo", addCut: true, single: true },
-  { id: "robot-top-logo", addCut: true },
+  { id: "robot-side-logo", addCut: false, outline: true, single: true },
+  { id: "robot-top-logo", addCut: false, outline: true },
   // Uber: window decals — the CutContour cut line is already in the layout
   { id: "car-uber-front-windshield-logo", addCut: false },
   { id: "car-uber-rear-windshield-logo", addCut: false },
-  { id: "car-uber-side-logo", addCut: true, single: true },
+  // The black app tile is part of the lockup: cut along it and the letters; the
+  // white "Uber" inside it is the film
+  { id: "car-uber-side-logo", addCut: false, outline: true, single: true },
   {
     id: "car-first-responders-notice",
     addCut: true,
@@ -215,9 +223,10 @@ const artMm = (pt: number) => Math.round((pt / PT) * 10) / 10;
 const ceilMm = (mmValue: number) => Math.ceil(mmValue - 1e-9) * PT;
 
 // Filled paths of the page in page coordinates (accounting for q/Q/cm) with their
-// fill color as written in the source ("0.75 0.69 1")
+// fill color as written in the source ("0.75 0.69 1"); white — paper, not ink
+// (0 0 0 0 k, 1 g, 1 1 1 rg)
 type Seg = { op: "m" | "l" | "c" | "h"; p: number[] };
-type Filled = { color: string; segs: Seg[] };
+type Filled = { color: string; white: boolean; evenOdd: boolean; segs: Seg[] };
 function filledPaths(doc: PDFDocument, page: PDFPage): Filled[] {
   const c = page.node.Contents();
   const streams = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
@@ -233,7 +242,8 @@ function filledPaths(doc: PDFDocument, page: PDFPage): Filled[] {
   let st: number[] = [];
   let path: Seg[] = [];
   let color = "";
-  const colors: string[] = [];
+  let white = false;
+  const colors: [string, boolean][] = [];
   const out: Filled[] = [];
   const mul = (a: number[], b: number[]) => [
     a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3],
@@ -247,9 +257,12 @@ function filledPaths(doc: PDFDocument, page: PDFPage): Filled[] {
   };
   for (const t of toks) {
     if (/^[-+]?\d*\.?\d/.test(t)) { st.push(Number(t)); continue; }
-    if (t === "q") { stack.push(ctm); colors.push(color); }
-    else if (t === "Q") { ctm = stack.pop()!; color = colors.pop()!; }
-    else if (["g", "rg", "k", "sc", "scn"].includes(t)) color = st.map(n).join(" ");
+    if (t === "q") { stack.push(ctm); colors.push([color, white]); }
+    else if (t === "Q") { ctm = stack.pop()!; [color, white] = colors.pop()!; }
+    else if (["g", "rg", "k", "sc", "scn"].includes(t)) {
+      color = st.map(n).join(" ");
+      white = t === "k" ? st.every((v) => v === 0) : ["g", "rg"].includes(t) && st.every((v) => v === 1);
+    }
     else if (t === "cm") ctm = mul(st.slice(-6), ctm);
     else if (t === "m" || t === "l") path.push({ op: t, p: tr(st.slice(-2)) });
     else if (t === "c") path.push({ op: "c", p: tr(st.slice(-6)) });
@@ -257,7 +270,7 @@ function filledPaths(doc: PDFDocument, page: PDFPage): Filled[] {
     else if (t === "re") {
       const [x, y, w, h] = st.slice(-4);
       path.push({ op: "m", p: tr([x, y]) }, { op: "l", p: tr([x + w, y]) }, { op: "l", p: tr([x + w, y + h]) }, { op: "l", p: tr([x, y + h]) }, { op: "h", p: [] });
-    } else if (["f", "F", "f*", "b", "b*", "B", "B*"].includes(t)) { if (path.length) out.push({ color, segs: path }); path = []; }
+    } else if (["f", "F", "f*", "b", "b*", "B", "B*"].includes(t)) { if (path.length) out.push({ color, white, evenOdd: t.endsWith("*"), segs: path }); path = []; }
     else if (t === "n" || t === "S" || t === "s") path = [];
     st = [];
   }
@@ -280,6 +293,21 @@ function subpaths(segs: Seg[]): Seg[][] {
   }
   return out.filter((sp) => sp.length > 1).map((sp) => [...sp, { op: "h", p: [] }]);
 }
+
+// Union of the fills — the outline to cut: outlined text often builds a letter from
+// overlapping contours, and cutting each would cut through it (union-paths.py)
+const PYTHON = existsSync(".venv/bin/python") ? ".venv/bin/python" : "python3";
+function unionFills(fills: Filled[]): Seg[] {
+  const out = execFileSync(PYTHON, ["scripts/union-paths.py"], {
+    input: JSON.stringify({ fills: fills.map(({ evenOdd, segs }) => ({ evenOdd, segs })) }),
+    maxBuffer: 64 << 20,
+  });
+  return JSON.parse(out.toString()).segs;
+}
+
+// Path operators shifted by (dx, dy)
+const pathOps = (segs: Seg[], dx: number, dy: number) =>
+  segs.map((sg) => (sg.op === "h" ? "h" : `${sg.p.map((v, k) => n(v + (k % 2 === 0 ? dx : dy))).join(" ")} ${sg.op}`));
 
 // Cut lines from the outlines of fills of one color (Job.cutFill)
 async function buildCutFill(job: Job, src: PDFDocument, color: string) {
@@ -357,7 +385,7 @@ const report: Record<string, unknown> = {};
 
 for (const job of jobs) {
   if (!existsSync(ORIG + fileOf(job))) continue;
-  if (!job.cutFill && !existsSync(PREVIEW_ORIG(job))) throw new Error(`No preview original: ${PREVIEW_ORIG(job)}`);
+  if (!job.cutFill && !job.outline && !existsSync(PREVIEW_ORIG(job))) throw new Error(`No preview original: ${PREVIEW_ORIG(job)}`);
   const src = await PDFDocument.load(readFileSync(ORIG + fileOf(job)));
   if (job.cutFill) {
     report[fileOf(job)] = await buildCutFill(job, src, job.cutFill);
@@ -389,11 +417,11 @@ for (const job of jobs) {
   const gs = ctx.register(ctx.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1, CA: 1, ca: 1 }));
   const art = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("ARTWORK") }));
   const cutLayer = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("CUT_CONTOUR") }));
-  const layers = [art, ...(job.addCut ? [cutLayer] : [])];
+  const layers = [art, ...(job.addCut || job.outline ? [cutLayer] : [])];
   doc.catalog.set(PDFName.of("OCProperties"), ctx.obj({ OCGs: layers, D: { Order: layers, ON: layers, BaseState: "ON" } }));
 
   const pages = job.single ? src.getPages().slice(0, 1) : src.getPages();
-  let geom: { sheet: number[]; cut: number[]; decal: number[]; art: number[]; cutPath?: string } = {
+  let geom: { sheet: number[]; cut: number[]; decal: number[]; art: number[]; cutPath?: string; outline?: boolean } = {
     sheet: [0, 0], cut: [0, 0, 0, 0], decal: [0, 0], art: [0, 0],
   };
   for (const [i, sp] of pages.entries()) {
@@ -449,7 +477,19 @@ for (const job of jobs) {
     }
     // Artwork bounds in points from the bottom-left corner: measured or ArtBox
     const pageH = sp.getMediaBox().height;
-    const a = job.ink
+    // Outline: the artwork's ink fills (white ones are the film showing through)
+    const fills = job.outline ? filledPaths(src, sp).filter((f) => !f.white) : [];
+    if (job.outline && !fills.length) throw new Error(`${job.id}: no fills on page ${i + 1}`);
+    const fillBox = () => {
+      const pts = fills.flatMap((f) => f.segs.flatMap((sg) => sg.p));
+      const xs = pts.filter((_, k) => k % 2 === 0);
+      const ys = pts.filter((_, k) => k % 2 === 1);
+      const x = Math.min(...xs), y = Math.min(...ys);
+      return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+    };
+    const a = job.outline
+      ? fillBox()
+      : job.ink
         ? { x: job.ink.x * PT, y: pageH - (job.ink.top + job.ink.h) * PT, width: job.ink.w * PT, height: job.ink.h * PT }
       : sp.getArtBox();
     // Cut line (or, for a ready contour, the artwork itself) — whole mm, artwork centered
@@ -476,15 +516,31 @@ for (const job of jobs) {
       ];
       page.node.addContentStream(ctx.register(ctx.flateStream(ops.join("\n") + "\n")));
     }
+    // Outline: the cut along every fill subpath
+    const ox = artX - a.x, oy = artY - a.y;
+    if (job.outline) {
+      addRes(page, "ColorSpace", { CSCut: cs });
+      addRes(page, "ExtGState", { GSCut: gs });
+      addRes(page, "Properties", { MCArt: art, MCCut: cutLayer });
+      const cut = pathOps(unionFills(fills), ox, oy);
+      const ops = [
+        "/OC /MCCut BDC", "q", "/CSCut CS 1 SCN", "0.25 w 4 M 0 j 0 J", "/GSCut gs", ...cut, "S", "Q", "EMC",
+      ];
+      page.node.addContentStream(ctx.register(ctx.flateStream(ops.join("\n") + "\n")));
+    }
     geom = {
       sheet: [mm(w), mm(h)],
       cut: job.addCut ? [mm(cutX), mm(cutY), mm(cutW), mm(cutH)] : [],
       decal: [mm(cutW), mm(cutH)],
       art: [artMm(a.width), artMm(a.height)],
+      ...(job.outline ? { outline: true } : {}),
     };
 
+    // Outline: the preview is drawn from the output page itself, so the cut line
+    // sits on the artwork exactly (the designer's SVG can be off by a percent)
+    if (i === 0 && job.outline) writeFileSync(PREVIEW_OUT(job), normalizeCutStrokes(pageToSvg(doc, page).svg));
     // Preview: move the old SVG (in points, relative to the old page) onto the new page
-    if (i === 0) {
+    else if (i === 0) {
       const orig = PREVIEW_ORIG(job);
       const svg = readFileSync(orig, "utf8");
       const m = svg.match(/<svg[^>]*viewBox="0 0 ([\d.]+) ([\d.]+)"[^>]*>([\s\S]*)<\/svg>\s*$/);

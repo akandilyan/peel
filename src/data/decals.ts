@@ -1,6 +1,6 @@
 // Peel prototype mock data: ready-made decals from print files.
 // Sizes, mm: widthMm/heightMm — the PDF page (sheet), artMm — the artwork itself
-// (ArtBox of the source PDF; for Unlock with live text — measured from the SVG), cutMm —
+// (ArtBox of the source PDF; for outline-cut decals — the bounds of the fills), cutMm —
 // the cut line added when rebuilding.
 
 /** Sidebar tabs: decals for cars and robots, team print (ID badges, lanyards, business cards). */
@@ -55,6 +55,9 @@ export interface Decal {
   cutMm?: [number, number, number, number];
   /** Shaped cut line (backing outline), SVG path in mm from the sheet's top left corner. */
   cutPath?: string;
+  /** Cut along the artwork's outline (drawn in the preview SVG): only the logo is
+   *  weeded out and applied with transfer tape, no film around it. */
+  outlineCut?: boolean;
   /** Previews (SVG from the source PDF). One layout, even if the car needs two. */
   previews: string[];
   /** PDF to download (static decals). Generators build their own PDFs. */
@@ -116,10 +119,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "base",
-    widthMm: 770,
-    heightMm: 110,
+    widthMm: 766,
+    heightMm: 106,
     artMm: [760, 99.1],
-    cutMm: [3, 3, 764, 104],
+    outlineCut: true,
     previews: ["/decals/preview/car-side-logo.svg"],
     source: "/decals/source/car-side-logo.pdf",
     production: "print-cut",
@@ -137,10 +140,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "base",
-    widthMm: 399,
-    heightMm: 64,
+    widthMm: 395,
+    heightMm: 60,
     artMm: [388.5, 53.9],
-    cutMm: [3, 3, 393, 58],
+    outlineCut: true,
     previews: ["/decals/preview/car-trunk-logo.svg"],
     source: "/decals/source/car-trunk-logo.pdf",
     production: "print-cut",
@@ -156,10 +159,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "base",
-    widthMm: 297,
-    heightMm: 50,
+    widthMm: 293,
+    heightMm: 46,
     artMm: [286.3, 39.7],
-    cutMm: [3, 3, 291, 44],
+    outlineCut: true,
     previews: ["/decals/preview/car-sensor-box-logo.svg"],
     source: "/decals/source/car-sensor-box-logo.pdf",
     production: "print-cut",
@@ -175,11 +178,11 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "service",
     group: "uber",
-    widthMm: 248,
-    heightMm: 33,
+    widthMm: 245,
+    heightMm: 30,
     // Text converted to outlines (regenerate-sources) — size from the visible letters
-    artMm: [237.7, 23],
-    cutMm: [3, 3, 242, 27],
+    artMm: [239, 23.1],
+    outlineCut: true,
     previews: ["/decals/preview/car-uber-unlock-notice.svg"],
     source: "/decals/source/car-uber-unlock-notice.pdf",
     production: "print-cut",
@@ -253,10 +256,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "uber",
-    widthMm: 584,
-    heightMm: 210,
+    widthMm: 580,
+    heightMm: 206,
     artMm: [573.9, 200],
-    cutMm: [3, 3, 578, 204],
+    outlineCut: true,
     previews: ["/decals/preview/car-uber-side-logo.svg"],
     source: "/decals/source/car-uber-side-logo.pdf",
     production: "print-cut",
@@ -362,10 +365,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "base",
-    widthMm: 375,
-    heightMm: 58,
+    widthMm: 371,
+    heightMm: 54,
     artMm: [365, 47.6],
-    cutMm: [3, 3, 369, 52],
+    outlineCut: true,
     previews: ["/decals/preview/robot-side-logo.svg"],
     source: "/decals/source/robot-side-logo.pdf",
     production: "print-cut",
@@ -383,10 +386,10 @@ export const allDecals: Decal[] = [
     kind: "static",
     category: "logo",
     group: "base",
-    widthMm: 130,
-    heightMm: 26,
+    widthMm: 126,
+    heightMm: 22,
     artMm: [120, 15.6],
-    cutMm: [3, 3, 124, 20],
+    outlineCut: true,
     previews: ["/decals/preview/robot-top-logo.svg"],
     source: "/decals/source/robot-top-logo.pdf",
     production: "print-cut",
