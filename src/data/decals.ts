@@ -8,7 +8,7 @@ export type Platform = "car" | "robot" | "team";
 /** generator — numbers, static — a ready file, business-card and id-badge — a
  *  form, lanyard — merch with designs to pick from. */
 export type DecalKind = "generator" | "static" | "business-card" | "id-badge" | "lanyard";
-/** Decal type — a group in the navigation. */
+/** Decal type (a wrap shows its size differently in Details). */
 export type DecalCategory = "id" | "logo" | "service" | "wrap" | "card";
 /** Navigation group: base elements or a partner program
  *  (uber — decals for Uber robotaxis). */
@@ -79,6 +79,8 @@ export interface Decal {
   variants?: DecalVariant[];
   /** Temporarily hidden from the UI (e.g. no working file). */
   hidden?: boolean;
+  /** The design isn't approved yet: an amber dot with a tooltip in the sidebar. */
+  draft?: boolean;
   /** Light artwork on a transparent background — preview on a checkerboard. */
   transparentPreview?: boolean;
 }
@@ -87,14 +89,6 @@ export const platforms: { id: Platform; name: string }[] = [
   { id: "car", name: "Car" },
   { id: "robot", name: "Robot" },
   { id: "team", name: "Team" },
-];
-
-const categories: { id: DecalCategory; name: string }[] = [
-  { id: "wrap", name: "Wrap" },
-  { id: "id", name: "IDs" },
-  { id: "logo", name: "Logos" },
-  { id: "service", name: "Service notices" },
-  { id: "card", name: "Cards" },
 ];
 
 export const allDecals: Decal[] = [
@@ -435,6 +429,7 @@ export const allDecals: Decal[] = [
     production: "print",
     // 30 mil (0.76 mm) is the standard CR80 thickness
     material: "White PVC card, 30 mil",
+    draft: true,
   },  {
     id: "team-lanyard",
     platform: "team",
@@ -466,6 +461,7 @@ export const allDecals: Decal[] = [
     // Coated for the Pantone C inks, matte, 0.4 mm (the 3D preview's thickness)
     material: "16 pt matte coated cover",
     // Print inks depend on the design: cardStyles in src/lib/business-card.ts
+    draft: true,
   },
 
 ];
@@ -485,13 +481,16 @@ export function decalFiles(
 /** Decals in the UI — without temporarily hidden ones. */
 export const decals = allDecals.filter((d) => !d.hidden);
 
-/** Platform decals in sidebar order: groups (Base, Uber), categories within them. */
+/** Platform decals in sidebar order: groups (Base, Uber), within each approved ones
+ *  alphabetically, then the not approved yet (draft) ones, alphabetically too. */
 export function decalsInOrder(platform: Platform): Decal[] {
-  const cat = (d: Decal) => categories.findIndex((c) => c.id === d.category);
   return groups.flatMap((g) =>
     decals
       .filter((d) => d.platform === platform && d.group === g.id)
-      .sort((x, y) => cat(x) - cat(y)),
+      .sort(
+        (x, y) =>
+          Number(!!x.draft) - Number(!!y.draft) || x.name.localeCompare(y.name),
+      ),
   );
 }
 

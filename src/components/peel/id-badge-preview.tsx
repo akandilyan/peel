@@ -770,12 +770,13 @@ export function IdBadgePreview({
               them and the photo buttons right (no photo yet — the empty square
               on the card takes a click or a dropped file). On a phone the tabs
               take their own row on top. */}
-          <CardFooter className="grid grid-cols-2 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+          <CardFooter className="grid grid-cols-2 items-center gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-x-6">
             <div className="min-w-0 justify-self-stretch">
               {/* Scrubber: pips at 5% steps would be 61 dots. Zooming starts
-                  framing, so the next drag on the photo moves it. */}
+                  framing, so the next drag on the photo moves it. Narrower than
+                  its column so it keeps clear of the tabs. */}
               {photo && (
-                <div className="max-w-[200px]">
+                <div className="max-w-[160px]">
                   <Slider
                     variant="scrubber"
                     label="Zoom"

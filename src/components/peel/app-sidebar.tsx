@@ -140,11 +140,25 @@ export function AppSidebar({ selectedId, onSelect, onHome }: AppSidebarProps) {
                       {/* New in the latest version — a dot after the name, like
                           new components on fluidfunctionalism.com (CUSTOM:
                           bg-blue-500 color as on the site, there's no token) */}
-                      {newDecalIds.has(d.id) && (
+                      {newDecalIds.has(d.id) && !d.draft && (
                         <span
                           className="inline-block size-1.5 shrink-0 rounded-full bg-blue-500"
                           aria-label="New"
                         />
+                      )}
+                      {/* Not approved yet — an amber dot in the same place, instead
+                          of the New one: one dot per item (CUSTOM:
+                          bg-amber-500, no token), with a tooltip; the padded span
+                          gives the hover a bigger target than the 6px dot */}
+                      {d.draft && (
+                        <Tooltip content="Not approved yet" side="right">
+                          <span className="-m-1 inline-flex shrink-0 p-1">
+                            <span
+                              className="size-1.5 rounded-full bg-amber-500"
+                              aria-label="Not approved yet"
+                            />
+                          </span>
+                        </Tooltip>
                       )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
