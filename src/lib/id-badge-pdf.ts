@@ -1,6 +1,8 @@
-// ID badge PDF for a card printer: two identical pages (front and back) the size
-// of the card — card printers print edge to edge on pre-cut cards, so there's no
-// bleed and no crop marks. Everything is RGB, which is what card printer drivers
+// ID badge PDF for a card printer: one page the size of the card — card printers
+// print on pre-cut cards, so there's no bleed and no crop marks. One page, not a
+// front and a back: the Badgy100 prints one side only, and a second page would
+// go onto a second card; for the back, feed the printed card again with the same
+// file. Everything is RGB, which is what card printer drivers
 // take: the photo as sRGB JPEG, the logo in the brand lavender corrected for the
 // printer (LOGO_PRINT_COLOR), the name as outlines in pure black — drivers send
 // 0 0 0 to the resin K panel, so the text comes out sharp instead of a YMC mix.
@@ -114,20 +116,16 @@ export async function exportIdBadge(
     ? ["q", "0 0 0 rg", ...pathOps(HIREART.d, hireartMap), "f", "Q"]
     : [];
 
-  // One content stream and one image, shared by both pages: the same design
-  // on both sides of the card
   const contents = ctx.register(
     ctx.flateStream(
       [...photoOps, ...logoOps, ...nameOps, ...labelOps, ...markOps].join("\n") + "\n",
     ),
   );
   const resources = ctx.obj({ XObject: image ? { Photo: image.ref } : {} });
-  for (let i = 0; i < 2; i++) {
-    const p = doc.addPage([W, H]);
-    p.setTrimBox(0, 0, W, H);
-    p.node.set(PDFName.of("Resources"), resources);
-    p.node.set(PDFName.of("Contents"), contents);
-  }
+  const page = doc.addPage([W, H]);
+  page.setTrimBox(0, 0, W, H);
+  page.node.set(PDFName.of("Resources"), resources);
+  page.node.set(PDFName.of("Contents"), contents);
 
   ctx.trailerInfo.Info = ctx.register(
     ctx.obj({

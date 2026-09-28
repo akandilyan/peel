@@ -164,7 +164,7 @@ export function photoRect(style: BadgeStyle): PhotoRect | null {
   return top === null ? null : { x: PHOTO.x, y: mm(top), sizeMm: PHOTO.sizeMm };
 }
 
-/** Card printers print at 300 dpi: less and the photo gets soft. Below
+/** The Badgy100 prints at 260 × 300 dpi: less and the photo gets soft. Below
  *  MIN_DPI it's visibly blurry. */
 export const PRINT_DPI = 300;
 export const MIN_DPI = 200;
