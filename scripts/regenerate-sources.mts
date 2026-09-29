@@ -19,6 +19,8 @@
 //   ink spread: shops that trace the artwork themselves would cut a fatter logo,
 //   and their RIP adds its own registration allowance). Sheet = artwork rounded up
 //   to whole mm + MARGIN, TrimBox = the rounded artwork box.
+// - cut from colored film (outline + film): the same cut along the outline, but
+//   nothing is printed — the PDF holds the CutContour only, the fills are dropped.
 // - prepress (prepress.mts): brand CMYK -> Pantone spot colors, black
 //   at most 280%, live text to outlines, CutContour cut lines 0.25 pt with overprint;
 // - OutputIntent Coated FOGRA39 (profile from Adobe if installed, otherwise a reference).
@@ -67,9 +69,17 @@ type Job = {
   card?: boolean;
   keep?: boolean;
   cutFill?: string;
+  // bothSides — with cutFill: the original holds one side of the car (its first
+  // pieces, the rest are dropped); the other side is added as mirror copies: each
+  // piece flipped left to right about its centroid, turned by angle (degrees,
+  // counterclockwise as the PDF draws it) and moved by [dx, dy] mm (y up)
+  bothSides?: { angle: number; moves: [number, number][] };
   // outline — print & cut along the artwork outline (see the rules above);
   // artwork bounds come from the fills, not ArtBox
   outline?: boolean;
+  // film — with outline: cut from colored film, not printed; only the cut line goes
+  // into the PDF and the preview
+  film?: boolean;
   // single — the original has identical pages (left and right side): keep
   // one, the required count is assembled on download (src/lib/export-static.ts)
   single?: boolean;
@@ -179,14 +189,15 @@ function addOutputIntent(doc: PDFDocument) {
 // id — decal name (as in src/data/decals.ts): originals {id}.pdf and {id}.svg
 // in the dir from the argument, output — source/{id}.pdf and preview/{id}.svg.
 const jobs: Job[] = [
-  // Avride logos: printed, cut along the letters, weeded, applied with transfer
-  // tape — only the logo goes on the car
-  { id: "car-side-logo", addCut: false, outline: true, single: true },
-  { id: "car-trunk-logo", addCut: false, outline: true },
-  { id: "car-sensor-box-logo", addCut: false, outline: true },
+  // Avride car logos: cut from Oracal 651 071 Grey along the letters, weeded,
+  // applied with transfer tape — only the logo goes on the car, nothing is printed
+  { id: "car-side-logo", addCut: false, outline: true, film: true, single: true },
+  { id: "car-trunk-logo", addCut: false, outline: true, film: true },
+  { id: "car-sensor-box-logo", addCut: false, outline: true, film: true },
   // Text is converted to outlines (prepress); the outline cut takes the bounds
-  // from the letters, not the original's live text frame (ArtBox)
-  { id: "car-uber-unlock-notice", addCut: false, outline: true, single: true, prepress: { outlineText: true } },
+  // from the letters, not the original's live text frame (ArtBox). Cut from the
+  // same grey film as the logos, not printed
+  { id: "car-uber-unlock-notice", addCut: false, outline: true, film: true, single: true, prepress: { outlineText: true } },
   { id: "car-uber-back-seat-notice", addCut: false },
   { id: "robot-side-logo", addCut: false, outline: true, single: true },
   { id: "robot-top-logo", addCut: false, outline: true },
@@ -207,8 +218,17 @@ const jobs: Job[] = [
   // the black card has 2 mm of bleed past the outline, in the same rounded shape
   { id: "car-uber-faq-qr-code-light", addCut: true, card: true },
   { id: "car-uber-faq-qr-code-dark", addCut: true, card: true },
-  // Wrap: the designer draws the pieces as lavender fills with red outlines
-  { id: "car-body-wrap", addCut: false, cutFill: "0.75 0.69 1" },
+  // Wrap: the designer draws the pieces as lavender fills with red outlines. The
+  // original lays out one side of the car twice; the second row becomes the
+  // mirrored side, turned 13.5° so its straight edge runs along the first row's
+  // slanted one (Isabella Russo's layout, Business Support): 1295 × 480 mm, fits
+  // across a 60 in roll
+  {
+    id: "car-body-wrap",
+    addCut: false,
+    cutFill: "0.75 0.69 1",
+    bothSides: { angle: 13.5, moves: [[491.827, -190.18], [-829.281, -344.502]] },
+  },
 ];
 
 const fileOf = (job: Job) => `${job.id}.pdf`;
@@ -309,6 +329,38 @@ function unionFills(fills: Filled[]): Seg[] {
 const pathOps = (segs: Seg[], dx: number, dy: number) =>
   segs.map((sg) => (sg.op === "h" ? "h" : `${sg.p.map((v, k) => n(v + (k % 2 === 0 ? dx : dy))).join(" ")} ${sg.op}`));
 
+// Area centroid of a closed straight-line subpath
+function centroid(sp: Seg[]): [number, number] {
+  const pts = sp.filter((sg) => sg.op !== "h").map((sg) => sg.p.slice(-2));
+  let a = 0, cx = 0, cy = 0;
+  for (let k = 0; k < pts.length; k++) {
+    const [x0, y0] = pts[k], [x1, y1] = pts[(k + 1) % pts.length];
+    const f = x0 * y1 - x1 * y0;
+    a += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f;
+  }
+  return [cx / (3 * a), cy / (3 * a)];
+}
+
+// Job.bothSides: keep the first pieces (one side), add their mirror copies
+function withMirrorSide(shapes: Seg[][], { angle, moves }: NonNullable<Job["bothSides"]>): Seg[][] {
+  if (shapes.some((sp) => sp.some((sg) => sg.op === "c"))) throw new Error("bothSides: pieces must be straight-line outlines");
+  const side = shapes.slice(0, moves.length);
+  const r = (angle * Math.PI) / 180, cos = Math.cos(r), sin = Math.sin(r);
+  const mirrored = side.map((sp, k) => {
+    const [cx, cy] = centroid(sp);
+    const [dx, dy] = moves[k].map((v) => v * PT);
+    return sp.map((sg) => {
+      const p: number[] = [];
+      for (let j = 0; j < sg.p.length; j += 2) {
+        const x = cx - sg.p[j], y = sg.p[j + 1] - cy; // flipped about the centroid
+        p.push(cx + x * cos - y * sin + dx, cy + x * sin + y * cos + dy);
+      }
+      return { op: sg.op, p };
+    });
+  });
+  return [...side, ...mirrored];
+}
+
 // Cut lines from the outlines of fills of one color (Job.cutFill)
 async function buildCutFill(job: Job, src: PDFDocument, color: string) {
   const doc = await PDFDocument.create({ updateMetadata: false });
@@ -323,10 +375,11 @@ async function buildCutFill(job: Job, src: PDFDocument, color: string) {
 
   const pages = [];
   for (const [i, sp] of src.getPages().entries()) {
-    const shapes = filledPaths(src, sp)
+    let shapes = filledPaths(src, sp)
       .filter((f) => f.color === color)
       .flatMap((f) => subpaths(f.segs));
     if (!shapes.length) throw new Error(`${job.id}: no fills of color ${color} on page ${i + 1}`);
+    if (job.bothSides) shapes = withMirrorSide(shapes, job.bothSides);
     const pts = shapes.flat().flatMap((sg) => sg.p);
     const xs = pts.filter((_, k) => k % 2 === 0);
     const ys = pts.filter((_, k) => k % 2 === 1);
@@ -417,7 +470,7 @@ for (const job of jobs) {
   const gs = ctx.register(ctx.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1, CA: 1, ca: 1 }));
   const art = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("ARTWORK") }));
   const cutLayer = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("CUT_CONTOUR") }));
-  const layers = [art, ...(job.addCut || job.outline ? [cutLayer] : [])];
+  const layers = [...(job.film ? [] : [art]), ...(job.addCut || job.outline ? [cutLayer] : [])];
   doc.catalog.set(PDFName.of("OCProperties"), ctx.obj({ OCGs: layers, D: { Order: layers, ON: layers, BaseState: "ON" } }));
 
   const pages = job.single ? src.getPages().slice(0, 1) : src.getPages();
@@ -502,8 +555,9 @@ for (const job of jobs) {
     const cutY = MARGIN;
     const artX = cutX + (cutW - a.width) / 2;
     const artY = cutY + (cutH - a.height) / 2;
-    // Move the source page artwork with an offset so it lands at artX/artY
-    const page = await placeInline(doc, src, i, [w, h], artX - a.x, artY - a.y, art);
+    // Move the source page artwork with an offset so it lands at artX/artY; film —
+    // a blank sheet, the artwork only gives the cut line
+    const page = job.film ? doc.addPage([w, h]) : await placeInline(doc, src, i, [w, h], artX - a.x, artY - a.y, art);
     page.setTrimBox(cutX, cutY, cutW, cutH);
     page.setBleedBox(0, 0, w, h);
     if (job.addCut) {
@@ -521,7 +575,7 @@ for (const job of jobs) {
     if (job.outline) {
       addRes(page, "ColorSpace", { CSCut: cs });
       addRes(page, "ExtGState", { GSCut: gs });
-      addRes(page, "Properties", { MCArt: art, MCCut: cutLayer });
+      addRes(page, "Properties", job.film ? { MCCut: cutLayer } : { MCArt: art, MCCut: cutLayer });
       const cut = pathOps(unionFills(fills), ox, oy);
       const ops = [
         "/OC /MCCut BDC", "q", "/CSCut CS 1 SCN", "0.25 w 4 M 0 j 0 J", "/GSCut gs", ...cut, "S", "Q", "EMC",

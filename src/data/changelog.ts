@@ -15,6 +15,16 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.6.2",
+    date: "2026-09-29",
+    changes: [
+      "Side, Trunk and Sensor box logos and the Unlock notice are cut from Oracal 651 071 Grey gloss film, not printed: their PDFs hold only the cut line, and the previews show it.",
+      "Windshield ID and Back seat notice list their film: Oracal 651 010 White gloss.",
+      "Body wrap covers both sides of the car: the second row is now the mirrored side, turned to nest along the first. The sheet is 1295 × 480 mm and fits across a 60 in roll.",
+    ],
+    decals: ["car-body-wrap", "car-side-logo", "car-trunk-logo", "car-sensor-box-logo", "car-uber-unlock-notice", "car-windshield-id", "car-uber-back-seat-notice"],
+  },
+  {
     version: "0.6.1",
     date: "2026-09-28",
     changes: [

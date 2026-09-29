@@ -63,8 +63,8 @@ export interface Decal {
   /** PDF to download (static decals). Generators build their own PDFs. */
   source?: string;
   production: Production;
-  /** Film: for cut decals — film in a catalog color (TeckWrap …, Black vinyl,
-   *  RAL 9004), for printed ones — the print base. No data — «—» in the details. */
+  /** Film: for cut decals — film in a catalog color (TeckWrap …, Oracal 651 071
+   *  Grey), for printed ones — the print base (Oracal 651 010 White). No data — «—» in the details. */
   material?: string;
   /** Print color (printed only: print, print-cut): PMS 6219 C, Black. */
   print?: string;
@@ -108,7 +108,7 @@ export const allDecals: Decal[] = [
     previews: ["/decals/preview/car-windshield-id.svg"],
     production: "cut",
     mounting: "Outside",
-    material: "White vinyl",
+    material: "Oracal 651 010 White, gloss",
     placement: "Windshield",
   },
   {
@@ -125,8 +125,9 @@ export const allDecals: Decal[] = [
     outlineCut: true,
     previews: ["/decals/preview/car-side-logo.svg"],
     source: "/decals/source/car-side-logo.pdf",
-    production: "print-cut",
-    print: "PMS 6219 C",
+    // Cut from colored film, nothing printed: the PDF holds the cut line only
+    production: "cut",
+    material: "Oracal 651 071 Grey, gloss",
     placement: "Both sides",
     mounting: "Outside",
     perVehicle: 2,
@@ -146,8 +147,9 @@ export const allDecals: Decal[] = [
     outlineCut: true,
     previews: ["/decals/preview/car-trunk-logo.svg"],
     source: "/decals/source/car-trunk-logo.pdf",
-    production: "print-cut",
-    print: "PMS 6219 C",
+    // Cut from colored film, nothing printed: the PDF holds the cut line only
+    production: "cut",
+    material: "Oracal 651 071 Grey, gloss",
     placement: "Trunk lid",
     mounting: "Outside",
   },
@@ -165,8 +167,9 @@ export const allDecals: Decal[] = [
     outlineCut: true,
     previews: ["/decals/preview/car-sensor-box-logo.svg"],
     source: "/decals/source/car-sensor-box-logo.pdf",
-    production: "print-cut",
-    print: "PMS 6219 C",
+    // Cut from colored film, nothing printed: the PDF holds the cut line only
+    production: "cut",
+    material: "Oracal 651 071 Grey, gloss",
     placement: "Sensor box",
     mounting: "Outside",
   },
@@ -185,10 +188,11 @@ export const allDecals: Decal[] = [
     outlineCut: true,
     previews: ["/decals/preview/car-uber-unlock-notice.svg"],
     source: "/decals/source/car-uber-unlock-notice.pdf",
-    production: "print-cut",
+    // Cut from colored film, nothing printed: the PDF holds the cut line only
+    production: "cut",
+    material: "Oracal 651 071 Grey, gloss",
     perVehicleNote: "one per rear door",
     placement: "Rear doors",
-    print: "PMS 6219 C",
     mounting: "Outside",
     perVehicle: 2,
   },
@@ -208,7 +212,7 @@ export const allDecals: Decal[] = [
     // Letters are entirely CutContour outlines, no fills — cut from film
     production: "cut",
     placement: "Front passenger window",
-    material: "White vinyl",
+    material: "Oracal 651 010 White, gloss",
     mounting: "Inside glass, mirrored",
   },
   {
@@ -325,13 +329,13 @@ export const allDecals: Decal[] = [
     id: "car-body-wrap",
     platform: "car",
     name: "Body wrap",
-    description: "Plotter-cut wrap shapes from Spanish Lavender film.",
+    description: "Plotter-cut wrap shapes for both sides of the car, from Spanish Lavender film.",
     kind: "static",
     category: "wrap",
     group: "base",
-    widthMm: 1249,
-    heightMm: 509,
-    artMm: [1242.4, 502.3],
+    widthMm: 1301,
+    heightMm: 486,
+    artMm: [1294.7, 479.8],
     previews: ["/decals/preview/car-body-wrap.svg"],
     source: "/decals/source/car-body-wrap.pdf",
     production: "cut",
