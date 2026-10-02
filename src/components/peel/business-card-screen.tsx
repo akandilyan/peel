@@ -42,9 +42,11 @@ import {
   layoutCard,
   officeAddress,
   offices,
+  WEBSITE,
   type CardDesign,
   type CardField,
   type CardFields,
+  type CardLine,
 } from "@/lib/business-card";
 import { exportBusinessCard } from "@/lib/business-card-pdf";
 import { backSvg, frontSvg } from "@/lib/business-card-svg";
@@ -125,10 +127,10 @@ export function BusinessCardBody({
         role: fields.role.trim() ? fields.role : exampleCard.role,
         email: fields.email.trim() ? fields.email : exampleCard.email,
       };
-  const hinted = new Set<CardField>(
+  const hinted = new Set<CardLine>(
     isExample ? [] : printed.filter((k) => k !== "phone" && !fields[k].trim()),
   );
-  const layout = layoutCard(shown);
+  const layout = layoutCard(shown, design.website);
   const { qr } = layout;
   const dense = qr.moduleMm < MIN_MODULE_MM;
 
@@ -299,7 +301,19 @@ export function BusinessCardBody({
               </Button>
             }
           >
-            <InputGroup className="w-full gap-0">{rows(PRINTED_FIELDS)}</InputGroup>
+            <InputGroup className="w-full gap-0">
+              {rows(PRINTED_FIELDS)}
+              {/* The website: fixed text, printed last, under the email. A
+                  design choice — Clear all leaves it as is */}
+              <FieldRow label="Website" optional>
+                <Switch
+                  className="px-0"
+                  label={WEBSITE}
+                  checked={design.website}
+                  onToggle={() => setDesign({ website: !design.website })}
+                />
+              </FieldRow>
+            </InputGroup>
           </FormCard>
           <FormCard
             title="In the QR code"

@@ -164,9 +164,18 @@ export const cardStyles: Record<CardStyle, CardStyleSpec> = {
 export interface CardDesign {
   style: CardStyle;
   rounded: boolean;
+  /** avride.ai printed as the last line, under the email */
+  website: boolean;
 }
 
-export const defaultDesign: CardDesign = { style: "classic", rounded: true };
+export const defaultDesign: CardDesign = {
+  style: "classic",
+  rounded: true,
+  website: false,
+};
+
+/** The optional printed website line. */
+export const WEBSITE = "avride.ai";
 
 const FONT_PX = 48;
 const LINE_GAP_PX = 12;
@@ -525,18 +534,21 @@ function layoutQr(data: string): QrLayout {
 
 // ─── Back side ───────────────────────────────────────────────────────────────
 
+/** A printed line: a field, or the optional website. */
+export type CardLine = CardField | "website";
+
 export interface CardLayout {
-  /** Printed lines by field; an empty phone has no line. */
-  lines: Partial<Record<CardField, TextLine>>;
-  maxWidth: Partial<Record<CardField, number>>;
+  /** Printed lines; an empty phone and a website left off have no line. */
+  lines: Partial<Record<CardLine, TextLine>>;
+  maxWidth: Partial<Record<CardLine, number>>;
   qr: QrLayout;
 }
 
-/** Back side: name and role at the top (each on up to two rows), phone and
- *  email at the bottom (the lower
- *  block sits on the bottom margin, so without a phone the email stays in place),
- *  QR code in the bottom right corner. */
-export function layoutCard(fields: CardFields): CardLayout {
+/** Back side: name and role at the top (each on up to two rows), phone, email
+ *  and the optional website at the bottom (the lower block sits on the bottom
+ *  margin and grows upward: without a phone the email stays in place, the website
+ *  lifts both), QR code in the bottom right corner. */
+export function layoutCard(fields: CardFields, website = false): CardLayout {
   const f = clean(fields);
   const left = px(MARGIN_PX);
   const step = px(FONT_PX + LINE_GAP_PX);
@@ -553,12 +565,16 @@ export function layoutCard(fields: CardFields): CardLayout {
   const qrTop = px(QR_PX.y);
   const limit = (lastRowTop: number) =>
     lastRowTop + FONT_MM > qrTop ? BOTTOM_MAX_WIDTH : TOP_MAX_WIDTH;
+  // Even with both name and role on two rows, the bottom block's three lines
+  // stay clear of them (top block ends at 320 px, the phone starts at 352)
+  const emailTop = website ? bottomLine - step : bottomLine;
   const lines: CardLayout["lines"] = {
     name: layoutRows(nameRows, left, top, step),
     role: layoutRows(roleRows, left, roleTop, step),
-    email: layoutFitted(f.email, left, bottomLine, BOTTOM_MAX_WIDTH, MIN_EMAIL_SCALE),
+    email: layoutFitted(f.email, left, emailTop, BOTTOM_MAX_WIDTH, MIN_EMAIL_SCALE),
   };
-  if (f.phone) lines.phone = layoutLine(f.phone, left, bottomLine - step);
+  if (f.phone) lines.phone = layoutLine(f.phone, left, emailTop - step);
+  if (website) lines.website = layoutLine(WEBSITE, left, bottomLine);
   return {
     lines,
     maxWidth: {
@@ -566,6 +582,7 @@ export function layoutCard(fields: CardFields): CardLayout {
       role: limit(roleTop + (roleRows.length - 1) * step),
       email: BOTTOM_MAX_WIDTH,
       phone: BOTTOM_MAX_WIDTH,
+      website: BOTTOM_MAX_WIDTH,
     },
     qr: layoutQr(vCard(f)),
   };

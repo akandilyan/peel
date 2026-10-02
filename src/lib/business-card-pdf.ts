@@ -194,7 +194,7 @@ export async function exportBusinessCard(
   ]);
 
   // Back: outlined text and QR modules — 100% K on paper, paper white on lavender
-  const layout = layoutCard(fields);
+  const layout = layoutCard(fields, design.website);
   const text = Object.values(layout.lines).flatMap((line) =>
     line!.glyphs.flatMap((g) =>
       pathOps(g.d, (x, y) => [X(g.x + x * g.scale), Y(g.y - y * g.scale)]),

@@ -8,9 +8,11 @@ import {
   cardStyles,
   glyphTransform,
   type CardDesign,
-  type CardField,
   type CardLayout,
+  type CardLine,
 } from "./business-card";
+
+type TextLineOf = NonNullable<CardLayout["lines"][CardLine]>;
 
 const r = (v: number) => Math.round(v * 10000) / 10000;
 
@@ -30,16 +32,16 @@ export function frontSvg(design: CardDesign): string {
 
 export function backSvg(
   layout: CardLayout,
-  hinted: Set<CardField>,
+  hinted: ReadonlySet<CardLine>,
   design: CardDesign,
 ): string {
   const style = cardStyles[design.style];
   const ink = style.text === "white" ? "#fff" : "#000";
   // Example text standing in for empty required fields: half-strength ink
   const hint = style.text === "white" ? "rgba(255,255,255,0.5)" : "#a3a3a3";
-  const text = (Object.entries(layout.lines) as [CardField, CardLayout["lines"][CardField]][])
+  const text = (Object.entries(layout.lines) as [CardLine, TextLineOf][])
     .map(([k, line]) => {
-      const glyphs = line!.glyphs
+      const glyphs = line.glyphs
         .map((g) => `<path d="${g.d}" transform="${glyphTransform(g)}"/>`)
         .join("");
       return `<g fill="${hinted.has(k) ? hint : ink}">${glyphs}</g>`;

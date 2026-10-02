@@ -15,6 +15,14 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.6.3",
+    date: "2026-10-02",
+    changes: [
+      "Business card: an optional Website switch prints avride.ai as the last line, under the email.",
+    ],
+    decals: ["team-business-card"],
+  },
+  {
     version: "0.6.2",
     date: "2026-09-29",
     changes: [
