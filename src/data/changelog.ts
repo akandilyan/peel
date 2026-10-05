@@ -15,6 +15,15 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.7.0",
+    date: "2026-10-05",
+    changes: [
+      "Robot: a new Advertising group for advertising formats, with the Side lockup — “Powered by Avride” for both sides of the robot, 336 mm wide, printed and cut along the letters.",
+      "Robot: the Side logo moves to a new Avride group; its old link opens the new page.",
+    ],
+    decals: ["robot-advertising-side-lockup", "robot-avride-side-logo"],
+  },
+  {
     version: "0.6.3",
     date: "2026-10-02",
     changes: [
@@ -39,7 +48,7 @@ export const changelog: Release[] = [
       "Logos and the Unlock notice are cut along the letters instead of a rectangle: only the artwork goes on the car, applied with transfer tape. Decals on a white card keep their card outline.",
       "Previews of these decals are drawn from the print file, so the cut line sits exactly on the artwork.",
     ],
-    decals: ["car-uber-unlock-notice", "car-uber-side-logo", "car-side-logo", "car-trunk-logo", "car-sensor-box-logo", "robot-side-logo", "robot-top-logo"],
+    decals: ["car-uber-unlock-notice", "car-uber-side-logo", "car-side-logo", "car-trunk-logo", "car-sensor-box-logo", "robot-avride-side-logo", "robot-top-logo"],
   },
   {
     version: "0.6.0",

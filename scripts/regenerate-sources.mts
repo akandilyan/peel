@@ -199,8 +199,11 @@ const jobs: Job[] = [
   // same grey film as the logos, not printed
   { id: "car-uber-unlock-notice", addCut: false, outline: true, film: true, single: true, prepress: { outlineText: true } },
   { id: "car-uber-back-seat-notice", addCut: false },
-  { id: "robot-side-logo", addCut: false, outline: true, single: true },
+  { id: "robot-avride-side-logo", addCut: false, outline: true, single: true },
   { id: "robot-top-logo", addCut: false, outline: true },
+  // Advertising: "Powered by Avride" from the Figma "Logo + descriptor" lockup, scaled to
+  // 336 mm wide; the same print & cut along the letters as the top logo
+  { id: "robot-advertising-side-lockup", addCut: false, outline: true, single: true },
   // Uber: window decals — the CutContour cut line is already in the layout
   { id: "car-uber-front-windshield-logo", addCut: false },
   { id: "car-uber-rear-windshield-logo", addCut: false },

@@ -10,13 +10,16 @@ export type Platform = "car" | "robot" | "team";
 export type DecalKind = "generator" | "static" | "business-card" | "id-badge" | "lanyard";
 /** Decal type (a wrap shows its size differently in Details). */
 export type DecalCategory = "id" | "logo" | "service" | "wrap" | "card";
-/** Navigation group: base elements or a partner program
- *  (uber — decals for Uber robotaxis). */
-export type DecalGroup = "base" | "uber";
+/** Navigation group: base elements, Avride branding, a partner program (uber —
+ *  decals for Uber robotaxis) or advertising — co-branding for advertising formats
+ *  ("Powered by Avride"). */
+export type DecalGroup = "base" | "avride" | "uber" | "advertising";
 
 export const groups: { id: DecalGroup; name: string }[] = [
   { id: "base", name: "Base" },
+  { id: "avride", name: "Avride" },
   { id: "uber", name: "Uber" },
+  { id: "advertising", name: "Advertising" },
 ];
 
 /** How it's produced: cut from colored film, print with contour cut, print only. */
@@ -362,19 +365,19 @@ export const allDecals: Decal[] = [
     perVehicleNote: "one per side of the lidar",
   },
   {
-    id: "robot-side-logo",
+    id: "robot-avride-side-logo",
     platform: "robot",
     name: "Side logo",
     description: "Avride logo for both sides of the robot.",
     kind: "static",
     category: "logo",
-    group: "base",
+    group: "avride",
     widthMm: 371,
     heightMm: 54,
     artMm: [365, 47.6],
     outlineCut: true,
-    previews: ["/decals/preview/robot-side-logo.svg"],
-    source: "/decals/source/robot-side-logo.pdf",
+    previews: ["/decals/preview/robot-avride-side-logo.svg"],
+    source: "/decals/source/robot-avride-side-logo.pdf",
     production: "print-cut",
     print: "PMS 2715 C",
     placement: "Both sides",
@@ -420,6 +423,27 @@ export const allDecals: Decal[] = [
     mounting: "Outside",
     placement: "Back",
     print: "Black",
+  },
+  {
+    id: "robot-advertising-side-lockup",
+    platform: "robot",
+    name: "Side lockup",
+    description: "“Powered by Avride” for both sides of a robot in an advertising wrap.",
+    kind: "static",
+    category: "logo",
+    group: "advertising",
+    widthMm: 342,
+    heightMm: 34,
+    artMm: [336, 27.7],
+    outlineCut: true,
+    previews: ["/decals/preview/robot-advertising-side-lockup.svg"],
+    source: "/decals/source/robot-advertising-side-lockup.pdf",
+    production: "print-cut",
+    print: "PMS 6219 C",
+    placement: "Both sides",
+    mounting: "Outside",
+    perVehicle: 2,
+    perVehicleNote: "left and right side",
   },
   {
     id: "team-id-badge",
@@ -514,4 +538,5 @@ export const renamedDecals: Record<string, string> = {
   "car-uber-side": "car-uber-side-logo",
   "car-first-responders": "car-first-responders-notice",
   "car-wrap-lavender": "car-body-wrap",
+  "robot-side-logo": "robot-avride-side-logo",
 };
