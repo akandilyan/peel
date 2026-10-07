@@ -42,7 +42,6 @@ export function BusinessCardPreview({
   sizeLabel,
   front,
   back,
-  rounded,
   footerStart,
   footerEnd,
 }: {
@@ -51,8 +50,6 @@ export function BusinessCardPreview({
   /** Sides as SVG markup in mm (business-card-svg.ts) */
   front: string;
   back: string;
-  /** Die-cut rounded corners */
-  rounded: boolean;
   /** Controls on the sides of the Front / Back tabs (the card design) */
   footerStart?: ReactNode;
   footerEnd?: ReactNode;
@@ -71,9 +68,8 @@ export function BusinessCardPreview({
 
   const mount = useRef<HTMLDivElement>(null);
   const scene = useRef<CardScene | null>(null);
-  // Latest sides and corners for a scene that loads after they change
+  // Latest sides for a scene that loads after they change
   const sides = useRef({ front, back });
-  const roundedRef = useRef(rounded);
 
   // The scene: three.js is fetched on demand, created once per mount
   useEffect(() => {
@@ -87,7 +83,6 @@ export function BusinessCardPreview({
         onReady: () => setReady(true),
       });
       s.setSides(sides.current.front, sides.current.back);
-      s.setRounded(roundedRef.current);
       scene.current = s;
     });
     return () => {
@@ -100,10 +95,6 @@ export function BusinessCardPreview({
     sides.current = { front, back };
     scene.current?.setSides(front, back);
   }, [front, back]);
-  useEffect(() => {
-    roundedRef.current = rounded;
-    scene.current?.setRounded(rounded);
-  }, [rounded]);
   useEffect(() => {
     scene.current?.setReducedMotion(reducedMotion);
   }, [reducedMotion, ready]);

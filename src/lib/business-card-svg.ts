@@ -16,16 +16,16 @@ type TextLineOf = NonNullable<CardLayout["lines"][CardLine]>;
 
 const r = (v: number) => Math.round(v * 10000) / 10000;
 
-/** Card background; rounded corners are cut out (transparent), like the die cut. */
-function background(fill: string, design: CardDesign): string {
-  const rx = design.rounded ? ` rx="${r(CORNER_MM)}"` : "";
-  return `<rect width="${r(CARD.widthMm)}" height="${r(CARD.heightMm)}"${rx} fill="${fill}"/>`;
+/** Card background; the rounded corners are cut out (transparent), as the
+ *  printer's corner die cuts them. */
+function background(fill: string): string {
+  return `<rect width="${r(CARD.widthMm)}" height="${r(CARD.heightMm)}" rx="${r(CORNER_MM)}" fill="${fill}"/>`;
 }
 
 export function frontSvg(design: CardDesign): string {
   const logo = LOGO.paths.map((d) => `<path d="${d}"/>`).join("");
   return (
-    background(cardStyles[design.style].front.screen, design) +
+    background(cardStyles[design.style].front.screen) +
     `<g transform="translate(${r(LOGO.x)} ${r(LOGO.y)}) scale(${LOGO.scale})" fill="#fff" fill-rule="evenodd">${logo}</g>`
   );
 }
@@ -61,7 +61,7 @@ export function backSvg(
       c = end;
     }
   return (
-    background(style.back?.screen ?? "#fff", design) +
+    background(style.back?.screen ?? "#fff") +
     text +
     // A hairline stroke in the fill color closes seams between rows
     `<path d="${d}" fill="${ink}" stroke="${ink}" stroke-width="0.01"/>`

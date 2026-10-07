@@ -18,7 +18,7 @@ export const changelog: Release[] = [
     version: "0.9.1",
     date: "2026-10-07",
     changes: [
-      "Business card: the PDF no longer has a die line for rounded corners, as the printer asked. Rounded corners are ordered from the printer as a finishing option.",
+      "Business card: no more die line in the PDF, as the printer asked, and rounded corners are now simply the card's design, with no switch. Order them from the printer (1/8 in).",
     ],
     decals: ["team-business-card"],
   },

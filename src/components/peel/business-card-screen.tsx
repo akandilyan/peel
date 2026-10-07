@@ -61,7 +61,7 @@ import { useBuild } from "./use-build";
 import { useUnits } from "./units-menu";
 
 // Business card builder (variant B): the 3D preview on top with the design under
-// the card (style swatches, rounded corners), the form under it (what's printed,
+// the card (style swatches), the form under it (what's printed,
 // what goes only into the QR code), the Download panel holds just the file. Native InputGroup / InputField; the details stay in this
 // browser — nothing is sent or saved.
 
@@ -248,21 +248,12 @@ export function BusinessCardBody({
           sizeLabel={formatSize(CARD.widthMm, CARD.heightMm, units, 1)}
           front={front}
           back={back}
-          rounded={design.rounded}
-          // Design right under the card it changes: style swatches on the left,
-          // rounded corners on the right of the Front / Back tabs
+          // Design right under the card it changes: style swatches on the left
+          // of the Front / Back tabs
           footerStart={
             <StyleSwatches
               value={design.style}
               onChange={(style) => setDesign({ style })}
-            />
-          }
-          footerEnd={
-            <Switch
-              className="px-0"
-              label="Rounded corners"
-              checked={design.rounded}
-              onToggle={() => setDesign({ rounded: !design.rounded })}
             />
           }
         />
@@ -385,11 +376,9 @@ export function BusinessCardBody({
             ["Sides", "Front and back"],
             [
               "Corners",
-              design.rounded
-                ? // Dies are named in inches; the radius in mm alongside. The PDF
-                  // has no die line: the printer rounds the corners with their die
-                  `Rounded, 1/8 in radius (${CORNER_MM.toFixed(1)} mm) · order from the printer`
-                : "Square",
+              // Dies are named in inches; the radius in mm alongside. No die line
+              // in the file: the rounding is ordered from the printer
+              `Rounded, 1/8 in radius (${CORNER_MM.toFixed(1)} mm) · order from the printer`,
             ],
             [
               "QR code",

@@ -94,9 +94,10 @@ export const CARD = {
   bleedMm: 25.4 / 8,
 };
 
-/** Rounded corners: 1/8 in (3.175 mm), the standard corner-rounding die of US
- *  print shops. The template's 32 px (2.7 mm) has no die; 1/8 in is 37.5 px on
- *  its grid. */
+/** Rounded corners, the card's design: 1/8 in (3.175 mm), the standard
+ *  corner-rounding die of US print shops (the template's 32 px, 2.7 mm, has no
+ *  die; 1/8 in is 37.5 px on its grid). The PDF has no die line, the printer
+ *  asked for none: the rounding is ordered from them with the print. */
 export const CORNER_MM = 25.4 / 8;
 
 // Colors: spot inks of the brand. On screen — the template's color; in the PDF —
@@ -163,14 +164,12 @@ export const cardStyles: Record<CardStyle, CardStyleSpec> = {
 /** How the card looks, apart from the person's details. */
 export interface CardDesign {
   style: CardStyle;
-  rounded: boolean;
   /** avride.ai printed as the last line, under the email */
   website: boolean;
 }
 
 export const defaultDesign: CardDesign = {
   style: "classic",
-  rounded: true,
   website: false,
 };
 
