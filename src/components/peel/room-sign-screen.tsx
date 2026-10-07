@@ -7,7 +7,6 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { InputField, InputGroup } from "@/components/ui/input-group";
 import type { Decal } from "@/data/decals";
 import {
   ROOM_SIGN,
@@ -17,8 +16,8 @@ import {
   parseRooms,
   roomLabel,
   roomSignFilms,
-  fitRoomsInput,
-  typeableRooms,
+  fitRoomName,
+  typeableRoom,
   type RoomFont,
   type RoomSignFilm,
 } from "@/lib/room-sign";
@@ -26,6 +25,7 @@ import { formatLengthWithUnits, formatSize } from "@/lib/units";
 import { DetailsTable, SizeValue } from "./decal-details";
 import { DecalPreview, type PreviewPage } from "./decal-preview";
 import { DownloadIsland, IslandRow, type ExportMode } from "./download-island";
+import { RoomList } from "./room-list";
 import { ScreenLayout } from "./screen-layout";
 import { useBuild } from "./use-build";
 import { useUnits } from "./units-menu";
@@ -74,8 +74,18 @@ export function RoomSignBody({
   const build = useBuild();
   const units = useUnits();
   const font = useRoomFont();
-  // The last change was cut: the name reached the longest that fits
-  const [clipped, setClipped] = useState(false);
+  // The field whose last change was cut: the name reached the longest that fits
+  const [clippedAt, setClippedAt] = useState<number | null>(null);
+  // One field per room, stored as lines; at least one (the placeholder)
+  const fields = input ? input.split("\n") : [""];
+  // The room shown in the preview: the focused field's once it has a name,
+  // else the one paged to
+  const [focused, setFocused] = useState<number | null>(null);
+  const [paged, setPaged] = useState(0);
+  const shown =
+    focused !== null && parseRooms(fields[focused] ?? "").length
+      ? parseRooms(fields.slice(0, focused).join("\n")).length
+      : paged;
   const current = roomSignFilms.find((f) => f.id === film) ?? roomSignFilms.find((f) => f.id === defaultRoomSignFilm)!;
   const rooms = parseRooms(input);
   const count = rooms.length;
@@ -94,19 +104,25 @@ export function RoomSignBody({
       sizeLabel: `Ø ${mm(ROOM_SIGN.diameterMm)}`,
       content: {
         type: "room",
-        room: { layout, color: current.screen },
+        room: { layout, film: current.id },
       },
     };
   };
 
-  const error = tooLong.length
-    ? `Too long to fit: ${tooLong.map(roomLabel).join(", ")}. Shorten it or break it with a /`
-    : undefined;
-
   return (
     <ScreenLayout
       header={header}
-      preview={<DecalPreview count={count} getPage={getPage} />}
+      preview={
+        <DecalPreview
+          count={count}
+          getPage={getPage}
+          index={shown}
+          onIndexChange={(i) => {
+            setPaged(i);
+            setFocused(null);
+          }}
+        />
+      }
       details={
         <DetailsTable
           rows={[
@@ -148,33 +164,32 @@ export function RoomSignBody({
             </IslandRow>
           }
           quantity={
-            <IslandRow label="Rooms">
-              {/* CUSTOM: a visible border, as the Numbers field */}
-              <InputGroup className="min-w-0 flex-1 [&_.ring-transparent]:ring-border">
-                <InputField
-                  index={0}
-                  label="Rooms"
-                  labelHidden
-                  placeholder="Chevapi, Big Bend"
-                  value={input}
-                  onChange={(v) => {
-                    build.reset();
-                    if (!font) return onInputChange(v);
-                    const fitted = fitRoomsInput(typeableRooms(v, font), font);
-                    setClipped(fitted.clipped);
-                    onInputChange(fitted.value);
-                  }}
-                  error={error}
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </InputGroup>
-            </IslandRow>
+            <RoomList
+              fields={fields}
+              onFieldsChange={(next) => {
+                build.reset();
+                let cut: number | null = null;
+                const fitted = next.map((f, i) => {
+                  if (!font) return f;
+                  const r = fitRoomName(typeableRoom(f, font), font);
+                  if (r.clipped) cut = i;
+                  return r.value;
+                });
+                setClippedAt(cut);
+                onInputChange(fitted.length === 1 && !fitted[0] ? "" : fitted.join("\n"));
+              }}
+              onFocusField={(i) => {
+                // An empty field keeps showing the room before it
+                setPaged(shown);
+                setFocused(i);
+              }}
+            />
           }
+          // In the caption, not under the field: there it can scroll out of view
           caption={
-            clipped
-              ? "That’s as long as a name fits. A / breaks the line by hand."
-              : "Commas between rooms; a / breaks the line by hand. Latin letters only."
+            clippedAt === null
+              ? "A / breaks the line by hand. Latin letters only."
+              : "That’s as long as a name fits. A / breaks the line by hand."
           }
           items={count}
           mode={mode}

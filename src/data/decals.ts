@@ -108,8 +108,8 @@ export interface Decal {
 export const platforms: { id: Platform; name: string }[] = [
   { id: "car", name: "Car" },
   { id: "robot", name: "Robot" },
-  { id: "team", name: "Team" },
   { id: "space", name: "Space" },
+  { id: "team", name: "Team" },
 ];
 
 export const allDecals: Decal[] = [

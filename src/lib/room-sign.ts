@@ -43,10 +43,9 @@ export const roomSignFilms: {
   id: RoomSignFilm;
   name: string;
   material: string;
-  screen: string;
 }[] = [
-  { id: "white", name: "White", material: "Oracal 651 010 White", screen: "#ffffff" },
-  { id: "black", name: "Black", material: "Oracal 651 070 Black", screen: "#111111" },
+  { id: "white", name: "White", material: "Oracal 651 010 White" },
+  { id: "black", name: "Black", material: "Oracal 651 070 Black" },
 ];
 
 export const defaultRoomSignFilm: RoomSignFilm = "black";
@@ -64,20 +63,23 @@ export async function loadRoomFont(): Promise<RoomFont> {
   return (await import("@/data/glyphs-room.json")).default as unknown as RoomFont;
 }
 
-/** What can be typed: letters the font has, the comma between rooms and the "/"
- *  line break. Anything else (Cyrillic, emoji) is dropped as it's typed. */
-export function typeableRooms(s: string, font: RoomFont): string {
+/** What can be typed in a room's field: letters the font has and the "/" line
+ *  break. Anything else (Cyrillic, emoji) is dropped as it's typed. */
+export function typeableRoom(s: string, font: RoomFont): string {
   return [...s.normalize("NFC")]
-    .map((ch) => (ch === "\n" || ch === "\t" ? " " : ch))
-    .filter((ch) => ch === "," || ch === "/" || ch in font.glyphs)
+    .map((ch) => (ch === "\t" ? " " : ch))
+    .filter((ch) => ch === "/" || ch in font.glyphs)
     .join("");
 }
 
-/** Room names from the field: comma-separated, spaces collapsed; "/" stays in
- *  the name as a manual line break. */
+/** A pasted list: one room per line, or separated by commas or semicolons. */
+export const splitRoomList = (text: string) => text.split(/[\r\n,;]+/);
+
+/** The rooms, one field each (stored as lines): spaces collapsed, empty fields
+ *  dropped; "/" stays in the name as a manual line break. */
 export function parseRooms(input: string): string[] {
   return input
-    .split(",")
+    .split("\n")
     .map((s) =>
       s
         .split("/")
@@ -272,31 +274,23 @@ export function roomSignFileName(
   return `${id}-${film}_${what}.${ext}`;
 }
 
-/** The field's text with every room cut to what fits: a letter that would take
- *  a name below MIN_FONT_PT isn't typed (a pasted name is cut at the end).
- *  clipped — something was cut. */
-export function fitRoomsInput(input: string, font: RoomFont): { value: string; clipped: boolean } {
-  let clipped = false;
-  const fits = (seg: string) => {
-    const [name] = parseRooms(seg);
+/** A room's field cut to what fits: a letter that would take the name below
+ *  MIN_FONT_PT isn't typed (a pasted name is cut at the end). clipped —
+ *  something was cut. */
+export function fitRoomName(field: string, font: RoomFont): { value: string; clipped: boolean } {
+  const fits = (s: string) => {
+    const [name] = parseRooms(s);
     return !name || !layoutRoomSign(name, font).tooLong;
   };
-  const value = input
-    .split(",")
-    .map((seg) => {
-      if (fits(seg)) return seg;
-      clipped = true;
-      // The longest start of the segment that fits
-      const chars = [...seg];
-      let lo = 0;
-      let hi = chars.length;
-      while (lo < hi) {
-        const mid = Math.ceil((lo + hi) / 2);
-        if (fits(chars.slice(0, mid).join(""))) lo = mid;
-        else hi = mid - 1;
-      }
-      return chars.slice(0, lo).join("");
-    })
-    .join(",");
-  return { value, clipped };
+  if (fits(field)) return { value: field, clipped: false };
+  // The longest start of the field that fits
+  const chars = [...field];
+  let lo = 0;
+  let hi = chars.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fits(chars.slice(0, mid).join(""))) lo = mid;
+    else hi = mid - 1;
+  }
+  return { value: chars.slice(0, lo).join(""), clipped: true };
 }
