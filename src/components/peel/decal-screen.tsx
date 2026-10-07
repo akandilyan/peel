@@ -32,6 +32,7 @@ import { BusinessCardBody } from "./business-card-screen";
 import { IdBadgeBody, type BadgeState } from "./id-badge-screen";
 import { LanyardBody } from "./lanyard-screen";
 import { LidarTransferBody } from "./lidar-transfer-screen";
+import { RoomSignBody } from "./room-sign-screen";
 import { CopiesStepper } from "./copies-stepper";
 import { CopyLinkButton } from "./copy-link-button";
 import {
@@ -116,6 +117,19 @@ export function DecalScreen(props: DecalScreenProps) {
         decal={props.decal}
         transfer={props.transfer}
         onTransferChange={props.onTransferChange}
+        header={header}
+      />
+    );
+  if (props.decal.kind === "room-sign")
+    return (
+      <RoomSignBody
+        decal={props.decal}
+        input={props.input}
+        onInputChange={props.onInputChange}
+        film={props.variant}
+        onFilmChange={props.onVariantChange}
+        mode={props.mode}
+        onModeChange={props.onModeChange}
         header={header}
       />
     );

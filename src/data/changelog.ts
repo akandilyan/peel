@@ -15,6 +15,14 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.9.0",
+    date: "2026-10-07",
+    changes: [
+      "A new Space tab for the office, with the Meeting room sign: type room names and download signs cut from white or black film. The name fits itself — one line while it fits, two even lines when it doesn't, smaller only for very long names.",
+    ],
+    decals: ["space-meeting-room-sign"],
+  },
+  {
     version: "0.8.0",
     date: "2026-10-06",
     changes: [

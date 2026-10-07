@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import previewSvgs from "@/data/preview-svgs.json";
 import { withBase } from "@/lib/base-path";
 import type { NumberLayout } from "@/lib/glyph-layout";
+import { ROOM_SIGN, type RoomSignLayout } from "@/lib/room-sign";
 import {
   Card,
   CardContent,
@@ -24,6 +25,7 @@ export type PreviewContent =
   | { type: "image"; src: string }
   | { type: "number"; layout: NumberLayout }
   | { type: "transfer"; transfer: TransferPreview }
+  | { type: "room"; room: RoomPreview }
   | { type: "missing" };
 
 /** Lidar ID transfer as it lies on the choker: cut contours (SVG paths, mm),
@@ -34,6 +36,28 @@ export interface TransferPreview {
   number: NumberLayout;
   top: [number, number];
 }
+
+/** Meeting room sign as it'll look applied: the ring and the name in the film's
+ *  color, large, without the sheet; no layout yet (the font is loading) — the
+ *  ring only. */
+export interface RoomPreview {
+  layout: RoomSignLayout | null;
+  color: string;
+}
+
+// The stage behind the room sign: the frosted film on a meeting room's glass,
+// milky grey, lighter in the middle where the room's light comes through, with
+// a fine grain; dimmer in the dark theme (the glass in a dim corridor), so it
+// doesn't glare. Its shades are CSS variables, set per theme by FROSTED_SHADES.
+const FROSTED_SHADES =
+  "[--frost-1:#e9ecee] [--frost-2:#dde1e4] [--frost-3:#c9ced3] dark:[--frost-1:#6f757c] dark:[--frost-2:#60666d] dark:[--frost-3:#4b5057]";
+const FROSTED_GLASS = {
+  backgroundColor: "var(--frost-2)",
+  backgroundImage: [
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E\")",
+    "radial-gradient(ellipse at 50% 40%, var(--frost-1) 0%, var(--frost-2) 45%, var(--frost-3) 100%)",
+  ].join(", "),
+};
 
 export interface PreviewPage {
   label: string;
@@ -153,11 +177,21 @@ function Sticker({ page }: { page: PreviewPage }) {
   const cell = Math.min(w, h) / 16;
   // No white sheet. Checkerboard only for transparent artwork and missing previews.
   const checker = page.transparent || content.type === "missing";
+  // The room sign fills a taller stage, cropped to its circle, with no sheet
+  const room = content.type === "room" ? content.room : null;
+  const crop = room ? (w - ROOM_SIGN.diameterMm) / 2 - 2 : 0;
 
   return (
-    <div className="flex h-[260px] items-center justify-center px-10 py-8">
+    <div
+      className={
+        room
+          ? `flex h-[400px] items-center justify-center rounded-lg p-8 ${FROSTED_SHADES}`
+          : "flex h-[260px] items-center justify-center px-10 py-8"
+      }
+      style={room ? FROSTED_GLASS : undefined}
+    >
       <svg
-        viewBox={`0 0 ${w} ${h}`}
+        viewBox={`${crop} ${crop} ${w - 2 * crop} ${h - 2 * crop}`}
         className="h-full w-full"
         // The sheet boundary sits on the decal edge: without this the outer half of the
         // line is clipped by the SVG bounds
@@ -192,6 +226,7 @@ function Sticker({ page }: { page: PreviewPage }) {
           <InlineSvg key={content.src} src={content.src} w={w} h={h} />
         )}
         {content.type === "transfer" && <Transfer transfer={content.transfer} />}
+        {room && <RoomSign room={room} size={w} />}
         {content.type === "number" && (
           // As in the PDF: only the digit outlines are cut, as a CutContour line
           <g
@@ -211,15 +246,17 @@ function Sticker({ page }: { page: PreviewPage }) {
           </g>
         )}
         {/* Sheet boundary (PDF page) — thin dashed line in the caption color */}
-        <rect
-          width={w}
-          height={h}
-          fill="none"
-          className="stroke-muted-foreground/60"
-          strokeWidth={1}
-          strokeDasharray="4 3"
-          vectorEffect="non-scaling-stroke"
-        />
+        {!room && (
+          <rect
+            width={w}
+            height={h}
+            fill="none"
+            className="stroke-muted-foreground/60"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
         {page.cutPath && (
           <path
             d={page.cutPath}
@@ -289,6 +326,28 @@ function Transfer({ transfer: t }: { transfer: TransferPreview }) {
       >
         Top · toward the lidar
       </text>
+    </>
+  );
+}
+
+// CUSTOM: the meeting room sign — the cut film itself: the ring and the letters
+// in the film's color.
+function RoomSign({ room, size }: { room: RoomPreview; size: number }) {
+  const c = size / 2;
+  const R = ROOM_SIGN.diameterMm / 2;
+  const r = R - ROOM_SIGN.ringMm;
+  const s = room.layout?.scale ?? 0;
+  return (
+    <>
+      <g fill={room.color}>
+        <path
+          fillRule="evenodd"
+          d={`M${c - R} ${c}a${R} ${R} 0 1 0 ${2 * R} 0a${R} ${R} 0 1 0 ${-2 * R} 0Z M${c - r} ${c}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`}
+        />
+        {room.layout?.glyphs.map((g, i) => (
+          <path key={i} d={g.d} transform={`translate(${g.x} ${g.y}) scale(${s} ${-s})`} />
+        ))}
+      </g>
     </>
   );
 }

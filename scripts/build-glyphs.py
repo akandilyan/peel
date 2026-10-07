@@ -16,7 +16,9 @@ The visitor badge name is CHAOS16 (SIL OFL):
 An optional list of OpenType features (comma-separated) swaps glyphs for their
 alternates: cv11 is Inter's single-storey a.
 
-chars "latin" is printable ASCII, Latin-1 letters and typographic punctuation.
+chars "latin" is printable ASCII, Latin-1 letters and typographic punctuation;
+"latin-ext" adds Latin Extended-A (the meeting room sign: Č, Ć, Š, Ž, Đ …):
+  python3 scripts/build-glyphs.py 600 32 latin-ext src/data/glyphs-room.json cv11
 
 Overlapping contours are merged (OverlapMode.REMOVE): the cut line must not
 intersect itself.
@@ -109,6 +111,8 @@ LATIN = (
     + "".join(chr(c) for c in range(0xC0, 0x100) if c not in (0xD7, 0xF7))
     + "\u2018\u2019\u201C\u201D\u2013\u2014\u2026\u00B7"
 )
+# Latin plus Latin Extended-A: Central European letters (Č Ć Š Ž Đ, Ł, Ő …)
+LATIN_EXT = LATIN + "".join(chr(c) for c in range(0x100, 0x180) if c != 0x149)  # ŉ is deprecated, not in Inter
 
 
 def main():
@@ -126,6 +130,8 @@ def main():
         font = instancer.instantiateVariableFont(TTFont(FONT), axes, overlap=instancer.OverlapMode.REMOVE)
     if chars == "latin":
         chars = LATIN
+    elif chars == "latin-ext":
+        chars = LATIN_EXT
     cmap = font.getBestCmap()
     gs = font.getGlyphSet()
     # A font without a space (the visitor badge's CHAOS16) gets one: a quarter

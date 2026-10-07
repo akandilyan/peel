@@ -3,30 +3,34 @@
 // (ArtBox of the source PDF; for outline-cut decals — the bounds of the fills), cutMm —
 // the cut line added when rebuilding.
 
-/** Sidebar tabs: decals for cars and robots, team print (ID badges, lanyards, business cards). */
-export type Platform = "car" | "robot" | "team";
+/** Sidebar tabs: decals for cars and robots, team print (ID badges, lanyards,
+ *  business cards), office space (meeting room signs). */
+export type Platform = "car" | "robot" | "team" | "space";
 /** generator — numbers, static — a ready file, business-card and id-badge — a
  *  form, lanyard — merch with designs to pick from, lidar-transfer — the Lidar
- *  ID transfer built from the choker's geometry. */
+ *  ID transfer built from the choker's geometry, room-sign — a sign generated
+ *  from room names. */
 export type DecalKind =
   | "generator"
   | "static"
   | "business-card"
   | "id-badge"
   | "lanyard"
-  | "lidar-transfer";
+  | "lidar-transfer"
+  | "room-sign";
 /** Decal type (a wrap shows its size differently in Details). */
 export type DecalCategory = "id" | "logo" | "service" | "wrap" | "card";
 /** Navigation group: base elements, Avride branding, a partner program (uber —
- *  decals for Uber robotaxis) or advertising — co-branding for advertising formats
- *  ("Powered by Avride"). */
-export type DecalGroup = "base" | "avride" | "uber" | "advertising";
+ *  decals for Uber robotaxis), advertising — co-branding for advertising formats
+ *  ("Powered by Avride"), or office — signs for the office. */
+export type DecalGroup = "base" | "avride" | "uber" | "advertising" | "office";
 
 export const groups: { id: DecalGroup; name: string }[] = [
   { id: "base", name: "Base" },
   { id: "avride", name: "Avride" },
   { id: "uber", name: "Uber" },
   { id: "advertising", name: "Advertising" },
+  { id: "office", name: "Office" },
 ];
 
 /** How it's produced: cut from colored film, print with contour cut, print only. */
@@ -105,6 +109,7 @@ export const platforms: { id: Platform; name: string }[] = [
   { id: "car", name: "Car" },
   { id: "robot", name: "Robot" },
   { id: "team", name: "Team" },
+  { id: "space", name: "Space" },
 ];
 
 export const allDecals: Decal[] = [
@@ -522,6 +527,24 @@ export const allDecals: Decal[] = [
     material: "16 pt matte coated cover",
     // Print inks depend on the design: cardStyles in src/lib/business-card.ts
     draft: true,
+  },
+  {
+    id: "space-meeting-room-sign",
+    platform: "space",
+    name: "Meeting room sign",
+    description: "A round sign with the room’s name for the meeting room door, cut from film.",
+    kind: "room-sign",
+    category: "service",
+    group: "office",
+    // A 380 mm sheet, the ring Ø 350 mm; the layout is in src/lib/room-sign.ts
+    widthMm: 380,
+    heightMm: 380,
+    artMm: [350, 350],
+    previews: [],
+    production: "cut",
+    // The film is picked on the page: roomSignFilms in src/lib/room-sign.ts
+    material: "Oracal 651, white or black",
+    placement: "Meeting room door",
   },
 ];
 

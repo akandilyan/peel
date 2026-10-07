@@ -25,8 +25,9 @@ import { defaultTransfer, type TransferDesign } from "@/lib/lidar-transfer";
 // Per-decal export parameters live in an external in-memory store: switching to
 // another decal keeps what was entered, and after a page reload everything
 // returns to defaults (not saved to the URL or the browser).
-// input — numbers (for generators), mode — file format, copies — how many cars
-// or robots (for static decals), variant — version of a decal with versions,
+// input — numbers (for generators) or room names (meeting room sign), mode — file
+// format, copies — how many cars or robots (for static decals), variant — version
+// of a decal with versions (the lanyard's design, the room sign's film),
 // card — business card details, cardDesign — its style and corners,
 // badge — ID badge name and photo (an object URL, the file stays in the browser),
 // transfer — the Lidar ID transfer's robot model and number length.

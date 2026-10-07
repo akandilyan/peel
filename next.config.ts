@@ -27,7 +27,17 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   // Explicit project root: otherwise Next.js finds an unrelated package-lock.json higher
   // up the tree (in the home folder) and uses that as the root
-  turbopack: { root: path.resolve(__dirname) },
+  turbopack: {
+    root: path.resolve(__dirname),
+    // paper.js (the meeting room sign's letter merging, browser only) requires
+    // jsdom and canvas under Node; the client components' server pass bundles it
+    // too, so these resolve to an empty module
+    resolveAlias: {
+      jsdom: "./src/lib/empty-module.ts",
+      "jsdom/lib/jsdom/living/generated/utils": "./src/lib/empty-module.ts",
+      canvas: "./src/lib/empty-module.ts",
+    },
+  },
 };
 
 export default nextConfig;
