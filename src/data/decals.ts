@@ -6,8 +6,15 @@
 /** Sidebar tabs: decals for cars and robots, team print (ID badges, lanyards, business cards). */
 export type Platform = "car" | "robot" | "team";
 /** generator — numbers, static — a ready file, business-card and id-badge — a
- *  form, lanyard — merch with designs to pick from. */
-export type DecalKind = "generator" | "static" | "business-card" | "id-badge" | "lanyard";
+ *  form, lanyard — merch with designs to pick from, lidar-transfer — the Lidar
+ *  ID transfer built from the choker's geometry. */
+export type DecalKind =
+  | "generator"
+  | "static"
+  | "business-card"
+  | "id-badge"
+  | "lanyard"
+  | "lidar-transfer";
 /** Decal type (a wrap shows its size differently in Details). */
 export type DecalCategory = "id" | "logo" | "service" | "wrap" | "card";
 /** Navigation group: base elements, Avride branding, a partner program (uber —
@@ -89,6 +96,9 @@ export interface Decal {
   draft?: boolean;
   /** Light artwork on a transparent background — preview on a checkerboard. */
   transparentPreview?: boolean;
+  /** A tool that applies this decal (Lidar ID → its transfer): a row with a
+   *  link in Details. */
+  appliedWith?: string;
 }
 
 export const platforms: { id: Platform; name: string }[] = [
@@ -363,6 +373,25 @@ export const allDecals: Decal[] = [
     mounting: "Outside",
     perVehicle: 2,
     perVehicleNote: "one per side of the lidar",
+    appliedWith: "robot-lidar-id-transfer",
+  },
+  {
+    // Built in code (src/lib/lidar-transfer.ts) for the robot model and the
+    // number length; sizes here are A1.5, four digits
+    id: "robot-lidar-id-transfer",
+    platform: "robot",
+    name: "Lidar ID transfer",
+    description: "Plastic strip that carries both lidar IDs onto the choker.",
+    kind: "lidar-transfer",
+    category: "id",
+    group: "base",
+    widthMm: 414,
+    heightMm: 92,
+    previews: [],
+    production: "cut",
+    placement: "Choker under the lidar",
+    // The A1.5 geometry waits for the choker's CAD model
+    draft: true,
   },
   {
     id: "robot-avride-side-logo",
@@ -494,7 +523,6 @@ export const allDecals: Decal[] = [
     // Print inks depend on the design: cardStyles in src/lib/business-card.ts
     draft: true,
   },
-
 ];
 
 /** Preview and PDF of a decal, or of its version (the first one by default). */

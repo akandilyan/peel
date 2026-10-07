@@ -15,6 +15,15 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.8.0",
+    date: "2026-10-06",
+    changes: [
+      "Robot: Lidar ID transfer — the plastic strip that carries both lidar IDs onto the choker, for the A1 and A1.5 and for three- and four-digit numbers. Built from the choker's geometry: windows sized to the decal, center markers, and an arrow cut out to show the top edge.",
+      "Lidar ID links to its transfer in Details.",
+    ],
+    decals: ["robot-lidar-id-transfer", "robot-lidar-id"],
+  },
+  {
     version: "0.7.0",
     date: "2026-10-05",
     changes: [

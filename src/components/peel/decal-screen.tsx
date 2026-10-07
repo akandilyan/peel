@@ -13,6 +13,7 @@ import { InputField, InputGroup } from "@/components/ui/input-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import { decalFiles, decalsInOrder, type Decal } from "@/data/decals";
 import type { CardDesign, CardFields } from "@/lib/business-card";
+import type { TransferDesign } from "@/lib/lidar-transfer";
 import {
   formatNumber,
   numberPresets,
@@ -30,6 +31,7 @@ import { useTypeScale } from "@/lib/size-context";
 import { BusinessCardBody } from "./business-card-screen";
 import { IdBadgeBody, type BadgeState } from "./id-badge-screen";
 import { LanyardBody } from "./lanyard-screen";
+import { LidarTransferBody } from "./lidar-transfer-screen";
 import { CopiesStepper } from "./copies-stepper";
 import { CopyLinkButton } from "./copy-link-button";
 import {
@@ -75,6 +77,9 @@ interface DecalScreenProps {
   /** ID badge name and photo */
   badge: BadgeState;
   onBadgeChange: (badge: BadgeState) => void;
+  /** Lidar ID transfer: robot model and number length */
+  transfer: TransferDesign;
+  onTransferChange: (transfer: TransferDesign) => void;
   /** Go to an adjacent decal (arrows next to the title) */
   onSelect: (id: string) => void;
 }
@@ -102,6 +107,15 @@ export function DecalScreen(props: DecalScreenProps) {
         decal={props.decal}
         design={props.variant}
         onDesignChange={props.onVariantChange}
+        header={header}
+      />
+    );
+  if (props.decal.kind === "lidar-transfer")
+    return (
+      <LidarTransferBody
+        decal={props.decal}
+        transfer={props.transfer}
+        onTransferChange={props.onTransferChange}
         header={header}
       />
     );
@@ -188,6 +202,7 @@ function GeneratorBody({
   onInputChange,
   mode,
   onModeChange,
+  onSelect,
   header,
 }: DecalScreenProps & { header: ReactNode }) {
   // Generators exist only for cars and robots
@@ -251,11 +266,14 @@ function GeneratorBody({
       preview={<DecalPreview count={count} getPage={getPage} />}
       details={
         <DetailsTable
-          rows={detailsRows(decal, {
-            main: inkLabel,
-            // Only the digits are cut; there is no cut line along the sheet edge
-            sub: `Cut along digits · Sheet ${sizeLabel}`,
-          })}
+          rows={[
+            ...detailsRows(decal, {
+              main: inkLabel,
+              // Only the digits are cut; there is no cut line along the sheet edge
+              sub: `Cut along digits · Sheet ${sizeLabel}`,
+            }),
+            ...appliedWithRow(decal, onSelect),
+          ]}
         />
       }
       island={
@@ -313,6 +331,32 @@ function GeneratorBody({
       }
     />
   );
+}
+
+// A tool that applies the decal (Lidar ID → Lidar ID transfer), a link to its page.
+// CUSTOM: an inline text link — Fluid's Button has no link variant.
+function appliedWithRow(
+  decal: Decal,
+  onSelect: (id: string) => void,
+): [string, ReactNode][] {
+  const tool = decal.appliedWith && decalsInOrder(decal.platform).find((d) => d.id === decal.appliedWith);
+  if (!tool) return [];
+  return [
+    [
+      "Applied with",
+      <a
+        key="applied-with"
+        href={withBase(`/${tool.id}/`)}
+        className="underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground"
+        onClick={(e) => {
+          e.preventDefault();
+          onSelect(tool.id);
+        }}
+      >
+        {tool.name}
+      </a>,
+    ],
+  ];
 }
 
 // ─── Static decal ────────────────────────────────────────────────────────────

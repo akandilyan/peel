@@ -23,7 +23,17 @@ import {
 export type PreviewContent =
   | { type: "image"; src: string }
   | { type: "number"; layout: NumberLayout }
+  | { type: "transfer"; transfer: TransferPreview }
   | { type: "missing" };
+
+/** Lidar ID transfer as it lies on the choker: cut contours (SVG paths, mm),
+ *  the number stuck over each window, the top edge's middle for its label. */
+export interface TransferPreview {
+  contours: string[];
+  windows: { x: number; y: number; angleDeg: number }[];
+  number: NumberLayout;
+  top: [number, number];
+}
 
 export interface PreviewPage {
   label: string;
@@ -181,6 +191,7 @@ function Sticker({ page }: { page: PreviewPage }) {
         {content.type === "image" && (
           <InlineSvg key={content.src} src={content.src} w={w} h={h} />
         )}
+        {content.type === "transfer" && <Transfer transfer={content.transfer} />}
         {content.type === "number" && (
           // As in the PDF: only the digit outlines are cut, as a CutContour line
           <g
@@ -233,5 +244,51 @@ function Sticker({ page }: { page: PreviewPage }) {
         )}
       </svg>
     </div>
+  );
+}
+
+// CUSTOM: the transfer — the cut line, and over each window the decal it carries
+// (its film edge dashed, the digits in the text color, upright as on the robot);
+// a caption over the top edge says which way is up.
+function Transfer({ transfer: t }: { transfer: TransferPreview }) {
+  const { number: nl } = t;
+  return (
+    <>
+      {t.windows.map((w, i) => (
+        <g
+          key={i}
+          transform={`translate(${w.x} ${w.y}) rotate(${w.angleDeg}) translate(${-nl.widthMm / 2} ${-nl.heightMm / 2})`}
+        >
+          <rect
+            width={nl.widthMm}
+            height={nl.heightMm}
+            fill="none"
+            className="stroke-muted-foreground/60"
+            strokeWidth={1}
+            strokeDasharray="3 2"
+            vectorEffect="non-scaling-stroke"
+          />
+          <g className="fill-foreground">
+            {nl.glyphs.map((g, j) => (
+              <path key={j} d={g.d} transform={g.transform} />
+            ))}
+          </g>
+        </g>
+      ))}
+      <g fill="none" stroke={CUT} strokeWidth={CUT_WIDTH}>
+        {t.contours.map((d, i) => (
+          <path key={i} d={d} vectorEffect="non-scaling-stroke" />
+        ))}
+      </g>
+      <text
+        x={t.top[0]}
+        y={t.top[1] - 5}
+        textAnchor="middle"
+        fontSize={8}
+        className="fill-muted-foreground"
+      >
+        Top · toward the lidar
+      </text>
+    </>
   );
 }

@@ -20,6 +20,7 @@ import { AppSidebar } from "./app-sidebar";
 import { DecalScreen, type ExportMode } from "./decal-screen";
 import { HomeScreen } from "./home-screen";
 import { emptyBadge, type BadgeState } from "./id-badge-screen";
+import { defaultTransfer, type TransferDesign } from "@/lib/lidar-transfer";
 
 // Per-decal export parameters live in an external in-memory store: switching to
 // another decal keeps what was entered, and after a page reload everything
@@ -27,7 +28,8 @@ import { emptyBadge, type BadgeState } from "./id-badge-screen";
 // input — numbers (for generators), mode — file format, copies — how many cars
 // or robots (for static decals), variant — version of a decal with versions,
 // card — business card details, cardDesign — its style and corners,
-// badge — ID badge name and photo (an object URL, the file stays in the browser).
+// badge — ID badge name and photo (an object URL, the file stays in the browser),
+// transfer — the Lidar ID transfer's robot model and number length.
 type Params = {
   input: Record<string, string>;
   mode: Record<string, ExportMode>;
@@ -36,6 +38,7 @@ type Params = {
   card: Record<string, CardFields>;
   cardDesign: Record<string, CardDesign>;
   badge: Record<string, BadgeState>;
+  transfer: Record<string, TransferDesign>;
 };
 const empty: Params = {
   input: {},
@@ -45,6 +48,7 @@ const empty: Params = {
   card: {},
   cardDesign: {},
   badge: {},
+  transfer: {},
 };
 let params = empty;
 const listeners = new Set<() => void>();
@@ -74,7 +78,7 @@ export function PeelApp() {
   const rawId = pathname.split("/")[1] || undefined;
   const pathId = rawId && (renamedDecals[rawId] ?? rawId);
   const decal = pathId ? decals.find((d) => d.id === pathId) : undefined;
-  const { input, mode, copies, variant, card, cardDesign, badge } = useSyncExternalStore(
+  const { input, mode, copies, variant, card, cardDesign, badge, transfer } = useSyncExternalStore(
     subscribe,
     () => params,
     () => empty,
@@ -142,6 +146,8 @@ export function PeelApp() {
                 onCardDesignChange={(d) => setParam("cardDesign", decal.id, d)}
                 badge={badge[decal.id] ?? emptyBadge}
                 onBadgeChange={(b) => setParam("badge", decal.id, b)}
+                transfer={transfer[decal.id] ?? defaultTransfer}
+                onTransferChange={(t) => setParam("transfer", decal.id, t)}
                 onSelect={selectById}
               />
             ) : (
