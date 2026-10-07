@@ -386,8 +386,9 @@ export function BusinessCardBody({
             [
               "Corners",
               design.rounded
-                ? // Dies are named in inches; the radius in mm alongside
-                  `Rounded, 1/8 in radius (${CORNER_MM.toFixed(1)} mm) · die cut`
+                ? // Dies are named in inches; the radius in mm alongside. The PDF
+                  // has no die line: the printer rounds the corners with their die
+                  `Rounded, 1/8 in radius (${CORNER_MM.toFixed(1)} mm) · order from the printer`
                 : "Square",
             ],
             [

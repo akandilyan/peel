@@ -15,6 +15,14 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.9.1",
+    date: "2026-10-07",
+    changes: [
+      "Business card: the PDF no longer has a die line for rounded corners, as the printer asked. Rounded corners are ordered from the printer as a finishing option.",
+    ],
+    decals: ["team-business-card"],
+  },
+  {
     version: "0.9.0",
     date: "2026-10-07",
     changes: [

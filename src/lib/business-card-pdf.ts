@@ -2,8 +2,9 @@
 // the card edge. Lavender is a spot color (PANTONE 2705 C or 2715 C, CMYK
 // fallback) over the whole bleed; the logo, and white text on a lavender back,
 // are knocked out to paper white. On a white back, text and the QR code are 100% K,
-// text always as outlines. Rounded corners add the die line: a CutContour path
-// on the trim in its own layer, 0.25 pt, overprinting.
+// text always as outlines. No die line, even for rounded corners: printers
+// round the corners with their own die, and a CutContour path in the file
+// could print as a magenta frame.
 
 import {
   PDFDocument,
@@ -13,7 +14,6 @@ import {
 } from "pdf-lib";
 import {
   CARD,
-  CORNER_MM,
   LOGO,
   cardStyles,
   layoutCard,
@@ -72,24 +72,6 @@ export function pathOps(d: string, map: Point): string[] {
   return ops;
 }
 
-// Rounded rectangle path; a circle quarter as one Bézier (k = 0.5523)
-function roundedRectOps(x: number, y: number, w: number, h: number, r: number): string[] {
-  const k = r * 0.5523;
-  const p = (...v: number[]) => v.map(n).join(" ");
-  return [
-    `${p(x + r, y)} m`,
-    `${p(x + w - r, y)} l`,
-    `${p(x + w - r + k, y, x + w, y + r - k, x + w, y + r)} c`,
-    `${p(x + w, y + h - r)} l`,
-    `${p(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h)} c`,
-    `${p(x + r, y + h)} l`,
-    `${p(x + r - k, y + h, x, y + h - r + k, x, y + h - r)} c`,
-    `${p(x, y + r)} l`,
-    `${p(x, y + r - k, x + r - k, y, x + r, y)} c`,
-    "h",
-  ];
-}
-
 export async function exportBusinessCard(
   fields: CardFields,
   design: CardDesign,
@@ -131,33 +113,6 @@ export async function exportBusinessCard(
     return inks.get(ink)!;
   };
 
-  // Die line for rounded corners: CutContour, overprinting, in the CUT layer
-  const die = design.rounded
-    ? {
-        cs: separation("CutContour", [0, 1, 0, 0]),
-        gs: ctx.register(ctx.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1 })),
-        layer: ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("CUT") })),
-      }
-    : null;
-  if (die)
-    doc.catalog.set(
-      PDFName.of("OCProperties"),
-      ctx.obj({ OCGs: [die.layer], D: { Order: [die.layer], ON: [die.layer] } }),
-    );
-  const dieOps = die
-    ? [
-        "/OC /Cut BDC",
-        "q",
-        "/Die CS 1 SCN",
-        "0.25 w",
-        "/DieGS gs",
-        ...roundedRectOps(t, t, W - 2 * t, H - 2 * t, CORNER_MM * PT_PER_MM),
-        "S",
-        "Q",
-        "EMC",
-      ]
-    : [];
-
   const addPage = (background: SpotInk | null, body: string[]) => {
     const p = doc.addPage([W, H]);
     p.setTrimBox(t, t, W - 2 * t, H - 2 * t);
@@ -165,19 +120,14 @@ export async function exportBusinessCard(
     p.node.set(
       PDFName.of("Resources"),
       ctx.obj({
-        ColorSpace: {
-          ...(background ? { Bg: inkOf(background) } : {}),
-          ...(die ? { Die: die.cs } : {}),
-        },
-        ExtGState: die ? { DieGS: die.gs } : {},
-        Properties: die ? { Cut: die.layer } : {},
+        ColorSpace: background ? { Bg: inkOf(background) } : {},
       }),
     );
     // Lavender over the whole bleed; what follows in paper white knocks out of it
     const fill = background ? ["q", "/Bg cs 1 scn", `0 0 ${n(W)} ${n(H)} re f`, "Q"] : [];
     p.node.set(
       PDFName.of("Contents"),
-      ctx.register(ctx.flateStream([...fill, ...body, ...dieOps].join("\n") + "\n")),
+      ctx.register(ctx.flateStream([...fill, ...body].join("\n") + "\n")),
     );
   };
 

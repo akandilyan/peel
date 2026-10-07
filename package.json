@@ -1,6 +1,6 @@
 {
   "name": "peel",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "scripts": {
     "predev": "node scripts/copy-mediapipe.mjs",
