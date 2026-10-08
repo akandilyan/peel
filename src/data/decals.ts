@@ -542,8 +542,8 @@ export const allDecals: Decal[] = [
     artMm: [350, 350],
     previews: [],
     production: "cut",
-    // The film is picked on the page: roomSignFilms in src/lib/room-sign.ts
-    material: "Oracal 651, white or black",
+    // One cut file for either film (ROOM_SIGN_FILMS): picked when ordering
+    material: "Oracal 651 010 White or 070 Black",
     placement: "Meeting room door",
   },
 ];

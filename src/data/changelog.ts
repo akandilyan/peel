@@ -15,6 +15,14 @@ export interface Release {
 
 export const changelog: Release[] = [
   {
+    version: "0.9.2",
+    date: "2026-10-08",
+    changes: [
+      "Meeting room sign: one cut file for white or black film — the film is picked when ordering, so the Film choice is gone, and the PDF holds the cut only. The preview shows the cut line, as for the numbers.",
+    ],
+    decals: ["space-meeting-room-sign"],
+  },
+  {
     version: "0.9.1",
     date: "2026-10-07",
     changes: [

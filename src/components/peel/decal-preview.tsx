@@ -41,7 +41,9 @@ export interface TransferPreview {
  *  layout yet (the font is loading) — the ring only. */
 export interface RoomPreview {
   layout: RoomSignLayout | null;
-  film: "white" | "black";
+  /** The letters' cut line with touching letters merged (room-sign-cut.ts);
+   *  none yet (paper.js is loading) — each letter's own outline */
+  letters?: string[];
 }
 
 export interface PreviewPage {
@@ -325,35 +327,28 @@ function Transfer({ transfer: t }: { transfer: TransferPreview }) {
   );
 }
 
-// CUSTOM: the meeting room sign on the card, as the other decals, in the film's
-// own color; a thin outline in the text color keeps black film readable on a
-// dark card and white film on a light one.
+// CUSTOM: the meeting room sign as its cut line, as the number decals: the
+// ring's two circles and the letters' outlines, large, no sheet.
 function RoomSign({ room, size }: { room: RoomPreview; size: number }) {
   const c = size / 2;
   const R = ROOM_SIGN.diameterMm / 2;
   const r = R - ROOM_SIGN.ringMm;
   const s = room.layout?.scale ?? 0;
+  const circle = (q: number) =>
+    `M${c - q} ${c}a${q} ${q} 0 1 0 ${2 * q} 0a${q} ${q} 0 1 0 ${-2 * q} 0Z`;
   return (
-    <>
-      <g
-        className="stroke-foreground/30"
-        fill={room.film === "black" ? "#111111" : "#ffffff"}
-        strokeWidth={1}
-      >
-        <path
-          fillRule="evenodd"
-          d={`M${c - R} ${c}a${R} ${R} 0 1 0 ${2 * R} 0a${R} ${R} 0 1 0 ${-2 * R} 0Z M${c - r} ${c}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`}
-          vectorEffect="non-scaling-stroke"
-        />
-        {room.layout?.glyphs.map((g, i) => (
-          <path
-            key={i}
-            d={g.d}
-            transform={`translate(${g.x} ${g.y}) scale(${s} ${-s})`}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </g>
-    </>
+    <g fill="none" stroke={CUT} strokeWidth={CUT_WIDTH}>
+      <path d={`${circle(R)} ${circle(r)}`} vectorEffect="non-scaling-stroke" />
+      {room.letters
+        ? room.letters.map((d, i) => <path key={i} d={d} vectorEffect="non-scaling-stroke" />)
+        : room.layout?.glyphs.map((g, i) => (
+            <path
+              key={i}
+              d={g.d}
+              transform={`translate(${g.x} ${g.y}) scale(${s} ${-s})`}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+    </g>
   );
 }

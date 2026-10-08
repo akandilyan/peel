@@ -1,38 +1,31 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Decal } from "@/data/decals";
 import {
   ROOM_SIGN,
-  defaultRoomSignFilm,
+  ROOM_SIGN_FILMS,
   layoutRoomSign,
   loadRoomFont,
   parseRooms,
   roomLabel,
-  roomSignFilms,
   fitRoomName,
   typeableRoom,
   type RoomFont,
-  type RoomSignFilm,
 } from "@/lib/room-sign";
+import { letterOutlines, loadCutScope, type CutScope } from "@/lib/room-sign-cut";
 import { formatLengthWithUnits, formatSize } from "@/lib/units";
 import { DetailsTable, SizeValue } from "./decal-details";
 import { DecalPreview, type PreviewPage } from "./decal-preview";
-import { DownloadIsland, IslandRow, type ExportMode } from "./download-island";
+import { DownloadIsland, type ExportMode } from "./download-island";
 import { RoomList } from "./room-list";
 import { ScreenLayout } from "./screen-layout";
 import { useBuild } from "./use-build";
 import { useUnits } from "./units-menu";
 
 // Meeting room sign: room names in, a cut-only PDF out — a page per room. The
-// name fits itself (src/lib/room-sign.ts); the film's color is for the preview
-// and the file name, the cut is the same.
+// name fits itself (src/lib/room-sign.ts); the preview is the cut line, as the
+// PDF's. One file for white or black film: the film is picked when ordering.
 
 // Shown until a room is typed: plainly a stand-in, as "Text" in the designer's
 // template, not a room that looks already typed
@@ -51,12 +44,23 @@ function useRoomFont(): RoomFont | null {
   return font;
 }
 
+/** paper.js for the letters' merged cut line, loaded after the page */
+function useCutScope(): CutScope | null {
+  const [scope, setScope] = useState<CutScope | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadCutScope().then((s) => alive && setScope(s));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return scope;
+}
+
 export function RoomSignBody({
   decal,
   input,
   onInputChange,
-  film,
-  onFilmChange,
   mode,
   onModeChange,
   header,
@@ -64,9 +68,6 @@ export function RoomSignBody({
   decal: Decal;
   input: string;
   onInputChange: (value: string) => void;
-  /** Stored as the decal's variant; none — the default */
-  film?: string;
-  onFilmChange: (film: RoomSignFilm) => void;
   mode: ExportMode;
   onModeChange: (mode: ExportMode) => void;
   header: ReactNode;
@@ -86,7 +87,9 @@ export function RoomSignBody({
     focused !== null && parseRooms(fields[focused] ?? "").length
       ? parseRooms(fields.slice(0, focused).join("\n")).length
       : paged;
-  const current = roomSignFilms.find((f) => f.id === film) ?? roomSignFilms.find((f) => f.id === defaultRoomSignFilm)!;
+  const scope = useCutScope();
+  // Merged letter outlines by room name: worked out once per name
+  const outlines = useRef(new Map<string, string[]>());
   const rooms = parseRooms(input);
   const count = rooms.length;
   const layouts = font ? rooms.map((r) => layoutRoomSign(r, font)) : [];
@@ -97,6 +100,14 @@ export function RoomSignBody({
   const getPage = (i: number): PreviewPage => {
     const name = rooms[i] ?? EXAMPLE;
     const layout = font ? (layouts[i] ?? layoutRoomSign(name, font)) : null;
+    let letters: string[] | undefined;
+    if (layout && scope) {
+      letters = outlines.current.get(name);
+      if (!letters) {
+        letters = letterOutlines(layout, scope);
+        outlines.current.set(name, letters);
+      }
+    }
     return {
       label: count ? roomLabel(name) : "Example",
       widthMm: ROOM_SIGN.sheetMm,
@@ -104,7 +115,7 @@ export function RoomSignBody({
       sizeLabel: `Ø ${mm(ROOM_SIGN.diameterMm)}`,
       content: {
         type: "room",
-        room: { layout, film: current.id },
+        room: { layout, letters },
       },
     };
   };
@@ -135,34 +146,14 @@ export function RoomSignBody({
               />,
             ],
             ["Production", "Cut from film, nothing printed"],
-            ["Material", current.material],
+            // The same cut file for either: the film is picked when ordering
+            ["Material", ROOM_SIGN_FILMS],
             ["Placement", decal.placement ?? "—"],
           ]}
         />
       }
       island={
         <DownloadIsland
-          variant={
-            <IslandRow label="Film">
-              {/* Native borderless Select, as for the file format */}
-              <Select
-                value={current.id}
-                onValueChange={(v) => {
-                  build.reset();
-                  onFilmChange(v as RoomSignFilm);
-                }}
-              >
-                <SelectTrigger variant="borderless" className="min-w-0" />
-                <SelectContent>
-                  {roomSignFilms.map((f, i) => (
-                    <SelectItem key={f.id} index={i} value={f.id}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </IslandRow>
-          }
           quantity={
             <RoomList
               fields={fields}
@@ -208,7 +199,6 @@ export function RoomSignBody({
                 return exportRoomSigns({
                   id: decal.id,
                   rooms,
-                  film: current.id,
                   font: font!,
                   mode: count > 1 ? mode : "pdf",
                   onProgress,

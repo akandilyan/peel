@@ -126,8 +126,6 @@ export function DecalScreen(props: DecalScreenProps) {
         decal={props.decal}
         input={props.input}
         onInputChange={props.onInputChange}
-        film={props.variant}
-        onFilmChange={props.onVariantChange}
         mode={props.mode}
         onModeChange={props.onModeChange}
         header={header}

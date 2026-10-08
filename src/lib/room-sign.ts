@@ -36,19 +36,8 @@ export const ROOM_SIGN = {
   maxLines: 3,
 };
 
-export type RoomSignFilm = "white" | "black";
-
-/** Films: Oracal 651 in white and black. */
-export const roomSignFilms: {
-  id: RoomSignFilm;
-  name: string;
-  material: string;
-}[] = [
-  { id: "white", name: "White", material: "Oracal 651 010 White" },
-  { id: "black", name: "Black", material: "Oracal 651 070 Black" },
-];
-
-export const defaultRoomSignFilm: RoomSignFilm = "black";
+/** The films it's cut from — picked when ordering: the cut file is the same. */
+export const ROOM_SIGN_FILMS = "Oracal 651 010 White or 070 Black";
 
 export interface RoomFont {
   unitsPerEm: number;
@@ -262,16 +251,11 @@ export function layoutRoomSign(name: string, font: RoomFont): RoomSignLayout {
   };
 }
 
-/** The sign's file name: space-meeting-room-sign-black_chevapi.pdf, or for a
- *  set, …_5-rooms.pdf / .zip */
-export function roomSignFileName(
-  id: string,
-  film: RoomSignFilm,
-  rooms: string[],
-  ext: "pdf" | "zip",
-): string {
+/** The sign's file name: space-meeting-room-sign_chevapi.pdf, or for a set,
+ *  …_5-rooms.pdf / .zip */
+export function roomSignFileName(id: string, rooms: string[], ext: "pdf" | "zip"): string {
   const what = rooms.length === 1 ? roomSlug(rooms[0]) : `${rooms.length}-rooms`;
-  return `${id}-${film}_${what}.${ext}`;
+  return `${id}_${what}.${ext}`;
 }
 
 /** A room's field cut to what fits: a letter that would take the name below
